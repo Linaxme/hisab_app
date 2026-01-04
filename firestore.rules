@@ -1,0 +1,293 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Get current user's document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Check if user belongs to a specific shop
+    function belongsToShop(shopId) {
+      return isAuthenticated() && getUserData().shopId == shopId;
+    }
+    
+    // Check if user is owner of the shop
+    function isShopOwner(shopId) {
+      return belongsToShop(shopId) && getUserData().role == 'owner';
+    }
+    
+    // Check if user is active (not disabled by owner)
+    function isActiveUser() {
+      return getUserData().active == true;
+    }
+    
+    // Check if user can access shop data (belongs to shop + is active)
+    function canAccessShop(shopId) {
+      return belongsToShop(shopId) && isActiveUser();
+    }
+    
+    // Check if user is owner and active
+    function isActiveOwner(shopId) {
+      return isShopOwner(shopId) && isActiveUser();
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Users can read their own document
+      // Owners can read any user in their shop (for staff list)
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (getUserData().role == 'owner' && resource.data.shopId == getUserData().shopId)
+      );
+      
+      // Allow list query for owners to see their staff
+      allow list: if isAuthenticated() && getUserData().role == 'owner';
+      
+      // Users can create their own document during signup
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can update their own profile (name only)
+      // ShopId can only be updated if it's currently null (joining a shop)
+      // Owner can update staff active status
+      allow update: if isAuthenticated() && (
+        // User updating own profile
+        (request.auth.uid == userId && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'updatedAt'])) ||
+          (resource.data.shopId == null && request.resource.data.shopId != null)
+        )) ||
+        // Owner updating staff status
+        (getUserData().role == 'owner' && 
+         resource.data.shopId == getUserData().shopId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt']))
+      );
+      
+      // Prevent deletion
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // SHOPS COLLECTION
+    // ============================================
+    match /shops/{shopId} {
+      // Anyone authenticated can read shop (for join flow - checking invite code)
+      allow read: if isAuthenticated();
+      
+      // Only authenticated users can create shops (they become owner)
+      allow create: if isAuthenticated() && 
+        request.resource.data.ownerUid == request.auth.uid;
+      
+      // Only shop owner can update shop settings
+      allow update: if isActiveOwner(shopId);
+      
+      // Prevent deletion
+      allow delete: if false;
+      
+      // ============================================
+      // OPENING CASH SUBCOLLECTION
+      // ============================================
+      match /openingCash/{date} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Only owner can create/update
+        allow create, update: if isActiveOwner(shopId);
+        
+        // Prevent deletion
+        allow delete: if false;
+      }
+      
+      // ============================================
+      // SALES SUBCOLLECTION
+      // ============================================
+      match /sales/{saleId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // EXPENSES SUBCOLLECTION
+      // ============================================
+      match /expenses/{expenseId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // EXPENSE CATEGORIES SUBCOLLECTION (Owner Only Write)
+      // ============================================
+      match /expenseCategories/{categoryId} {
+        // Anyone in shop can read (for dropdown)
+        allow read: if canAccessShop(shopId);
+        
+        // Only owner can create/update/delete
+        allow create, update, delete: if isActiveOwner(shopId);
+        
+        // Subcategories
+        match /subcategories/{subId} {
+          // Anyone in shop can read
+          allow read: if canAccessShop(shopId);
+          
+          // Only owner can create/update/delete
+          allow create, update, delete: if isActiveOwner(shopId);
+        }
+      }
+      
+      // ============================================
+      // DEPOSITS SUBCOLLECTION
+      // ============================================
+      match /deposits/{depositId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // RETURNS SUBCOLLECTION
+      // ============================================
+      match /returns/{returnId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // CREDIT SALES SUBCOLLECTION
+      // ============================================
+      match /creditSales/{creditId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // CREDIT COLLECTIONS SUBCOLLECTION
+      // ============================================
+      match /creditCollections/{collectionId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        
+        // Creator or owner can update
+        allow update: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+        
+        // Creator or owner can delete
+        allow delete: if canAccessShop(shopId) && (
+          resource.data.createdBy == request.auth.uid || 
+          isShopOwner(shopId)
+        );
+      }
+      
+      // ============================================
+      // PRODUCTS SUBCOLLECTION
+      // ============================================
+      match /products/{productId} {
+        // Anyone in shop can read
+        allow read: if canAccessShop(shopId);
+        
+        // Anyone active in shop can create
+        allow create: if canAccessShop(shopId);
+        
+        // Anyone in shop can update
+        allow update: if canAccessShop(shopId);
+        
+        // Anyone in shop can delete (soft delete with active flag)
+        allow delete: if canAccessShop(shopId);
+      }
+    }
+  }
+}

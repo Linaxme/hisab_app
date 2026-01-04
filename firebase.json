@@ -1,0 +1,42 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "hisab-app-2b647",
+          "appId": "1:699268160570:android:10fd99cee7562f0d29e903",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "hisab-app-2b647",
+          "configurations": {
+            "android": "1:699268160570:android:10fd99cee7562f0d29e903",
+            "ios": "1:699268160570:ios:a4957db1e296f89d29e903",
+            "macos": "1:699268160570:ios:a4957db1e296f89d29e903",
+            "web": "1:699268160570:web:25ae808899b8eac129e903",
+            "windows": "1:699268160570:web:51d2c3dbc8fe4a6d29e903"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
