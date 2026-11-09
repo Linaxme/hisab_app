@@ -119,11 +119,15 @@ class ExpenseCategoryModel {
   final int order;
   final DateTime createdAt;
 
+  /// Money put aside (e.g. a savings group), kept out of expense totals.
+  final bool isSavings;
+
   ExpenseCategoryModel({
     required this.id,
     required this.name,
     required this.order,
     required this.createdAt,
+    this.isSavings = false,
   });
 
   factory ExpenseCategoryModel.fromFirestore(DocumentSnapshot doc) {
@@ -131,8 +135,9 @@ class ExpenseCategoryModel {
     return ExpenseCategoryModel(
       id: doc.id,
       name: data['name'] ?? '',
-      order: data['order'] ?? 0,
+      order: (data['order'] as num?)?.toInt() ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isSavings: data['isSavings'] == true,
     );
   }
 
@@ -141,6 +146,7 @@ class ExpenseCategoryModel {
       'name': name,
       'order': order,
       'createdAt': FieldValue.serverTimestamp(),
+      if (isSavings) 'isSavings': true,
     };
   }
 }

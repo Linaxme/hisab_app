@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
+import '../../../widgets/app_actions.dart';
 import '../../../widgets/modern_widgets.dart';
 
 /// More Screen - Settings, Profile, etc.
@@ -15,258 +17,280 @@ class MoreScreen extends ConsumerWidget {
     final currentUser = ref.watch(currentUserProvider).valueOrNull;
     final currentShop = ref.watch(currentShopProvider).valueOrNull;
     final isOwner = currentUser?.isOwner ?? false;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final locale = ref.watch(languageProvider);
+    String t(String key) => tr(locale, key);
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Text(
-                tr(locale, 'more_title'),
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 24),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            ScreenHeader(title: t('more_title')),
+            const SizedBox(height: 16),
 
-              // User Info Card
-              ModernCard(
-                onTap: () => context.push('/profile'),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: AppTheme.primaryColor,
-                      child: Text(
-                        (currentUser?.name ?? 'U')[0].toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentUser?.name ?? 'User',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            currentShop?.name ?? 'No Shop',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isOwner
-                            ? AppTheme.primaryColor
-                            : AppTheme.accentColor,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isOwner ? tr(locale, 'owner') : tr(locale, 'staff'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Profile card
+            _ProfileCard(
+              name: currentUser?.name ?? 'User',
+              shopName: currentShop?.name ?? t('no_shop'),
+              roleLabel: isOwner ? t('owner') : t('staff'),
+              onTap: () => context.push('/profile'),
+            ).animate().fadeIn().slideY(begin: 0.05),
 
-              const SizedBox(height: 24),
-
-              // Menu Items
-              SectionHeader(title: tr(locale, 'general')),
-              const SizedBox(height: 10),
-
-              _MenuItem(
-                icon: Icons.savings_rounded,
-                title: 'Deposits',
-                subtitle: 'Track cash deposits',
-                onTap: () => context.go('/deposits'),
-              ),
-              _MenuItem(
-                icon: Icons.assignment_return_rounded,
-                title: 'Returns',
-                subtitle: 'Manage returns',
-                onTap: () => context.go('/returns'),
-              ),
-
-              if (isOwner) ...[
-                const SizedBox(height: 20),
-                const SectionHeader(title: 'Owner'),
-                const SizedBox(height: 10),
-
+            const SizedBox(height: 24),
+            SectionHeader(title: t('nav_records')),
+            const SizedBox(height: 10),
+            _MenuGroup(
+              children: [
                 _MenuItem(
-                  icon: Icons.calendar_month_rounded,
-                  title: 'Monthly Summary',
-                  subtitle: 'View monthly reports',
-                  onTap: () => context.go('/monthly-summary'),
+                  icon: Icons.handshake_rounded,
+                  color: AppTheme.warningColor,
+                  title: t('nav_credit'),
+                  subtitle: t('menu_credit_sub'),
+                  onTap: () => context.push('/credit'),
                 ),
                 _MenuItem(
-                  icon: Icons.inventory_2_rounded,
-                  title: 'Products',
-                  subtitle: 'Manage product names',
-                  onTap: () => context.go('/products-settings'),
+                  icon: Icons.savings_rounded,
+                  color: AppTheme.accentColor,
+                  title: t('nav_deposits'),
+                  subtitle: t('menu_deposits_sub'),
+                  onTap: () => context.push('/deposits'),
                 ),
                 _MenuItem(
-                  icon: Icons.settings_rounded,
-                  title: 'Settings',
-                  subtitle: 'Manage shop settings',
-                  onTap: () => context.go('/settings'),
+                  icon: Icons.assignment_return_rounded,
+                  color: AppTheme.violetColor,
+                  title: t('nav_returns'),
+                  subtitle: t('menu_returns_sub'),
+                  onTap: () => context.push('/returns'),
                 ),
               ],
+            ).animate().fadeIn(delay: 80.ms),
 
+            if (isOwner) ...[
               const SizedBox(height: 20),
-              const SectionHeader(title: 'Appearance'),
+              SectionHeader(title: t('nav_owner')),
               const SizedBox(height: 10),
+              _MenuGroup(
+                children: [
+                  _MenuItem(
+                    icon: Icons.calendar_month_rounded,
+                    color: AppTheme.primaryColor,
+                    title: t('nav_monthly'),
+                    subtitle: t('menu_monthly_sub'),
+                    onTap: () => context.push('/monthly-summary'),
+                  ),
+                  _MenuItem(
+                    icon: Icons.inventory_2_rounded,
+                    color: AppTheme.warningColor,
+                    title: t('nav_products'),
+                    subtitle: t('menu_products_sub'),
+                    onTap: () => context.push('/products-settings'),
+                  ),
+                  _MenuItem(
+                    icon: Icons.settings_rounded,
+                    color: AppTheme.infoColor,
+                    title: t('nav_settings'),
+                    subtitle: t('menu_settings_sub'),
+                    onTap: () => context.push('/settings'),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 140.ms),
+            ],
 
-              ModernCard(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            isDark
-                                ? Icons.dark_mode_rounded
-                                : Icons.light_mode_rounded,
-                            color: AppTheme.primaryColor,
-                          ),
+            const SizedBox(height: 20),
+            SectionHeader(title: t('nav_appearance')),
+            const SizedBox(height: 10),
+            _MenuGroup(
+              children: [
+                _MenuRow(
+                  icon: Icons.translate_rounded,
+                  color: AppTheme.accentColor,
+                  title: t('language'),
+                  subtitle: locale.languageCode == 'bn' ? 'বাংলা' : 'English',
+                  trailing: SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    style: const ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    segments: const [
+                      ButtonSegment(value: 'bn', label: Text('বাং')),
+                      ButtonSegment(value: 'en', label: Text('EN')),
+                    ],
+                    selected: {locale.languageCode},
+                    onSelectionChanged: (value) => ref
+                        .read(languageProvider.notifier)
+                        .setLanguage(value.first),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 200.ms),
+
+            const SizedBox(height: 20),
+            _MenuGroup(
+              children: [
+                _MenuItem(
+                  icon: Icons.logout_rounded,
+                  color: AppTheme.errorColor,
+                  title: t('logout'),
+                  titleColor: AppTheme.errorColor,
+                  showChevron: false,
+                  onTap: () => confirmAndLogout(context, ref),
+                ),
+              ],
+            ).animate().fadeIn(delay: 260.ms),
+
+            const SizedBox(height: 32),
+            Center(
+              child: Column(
+                children: [
+                  const IconBadge(
+                    icon: Icons.storefront_rounded,
+                    color: AppTheme.primaryColor,
+                    gradient: AppTheme.primaryGradient,
+                    size: 40,
+                    iconSize: 20,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    t('app_tagline'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Version 1.0.0',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  final String name;
+  final String shopName;
+  final String roleLabel;
+  final VoidCallback onTap;
+
+  const _ProfileCard({
+    required this.name,
+    required this.shopName,
+    required this.roleLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppTheme.heroGradient,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.22)),
+        boxShadow: AppTheme.softShadow(AppTheme.primaryColor, strength: 0.8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -60,
+                top: -70,
+                child: AppTheme.glowBlob(size: 200),
+              ),
+              Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
+                  ),
+                  child: Text(
+                    name.isEmpty ? 'U' : name[0].toUpperCase(),
+                    style: AppTheme.numeric(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.onPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Dark Mode',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              isDark ? 'On' : 'Off',
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.storefront_rounded,
+                            size: 14,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              shopName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 13,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Switch(
-                      value: isDark,
-                      onChanged: (value) {
-                        ref.read(themeModeProvider.notifier).toggleTheme();
-                      },
-                      activeThumbColor: AppTheme.primaryColor,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Logout
-              ModernCard(
-                onTap: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.errorColor,
                           ),
-                          child: const Text('Logout'),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (confirm == true) {
-                    await ref.read(authRepositoryProvider).signOut();
-                  }
-                },
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.logout_rounded,
-                        color: AppTheme.errorColor,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Logout',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.errorColor,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // App Version
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      'Shop Accounting',
-                      style: Theme.of(context).textTheme.titleMedium,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.goldColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppTheme.goldColor.withValues(alpha: 0.4),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Version 1.0.0',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                      ),
+                  ),
+                  child: Text(
+                    roleLabel,
+                    style: const TextStyle(
+                      color: AppTheme.goldColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white),
+              ],
+            ),
+          ),
             ],
           ),
         ),
@@ -275,99 +299,116 @@ class MoreScreen extends ConsumerWidget {
   }
 }
 
+/// Card that stacks menu rows with dividers between them
+class _MenuGroup extends StatelessWidget {
+  final List<Widget> children;
+
+  const _MenuGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppTheme.cardDecoration(context, radius: 20),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1, indent: 64),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MenuItem extends StatelessWidget {
   final IconData icon;
+  final Color color;
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final Color? titleColor;
+  final bool showChevron;
   final VoidCallback onTap;
 
   const _MenuItem({
     required this.icon,
+    required this.color,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
+    this.titleColor,
+    this.showChevron = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.blue.withValues(alpha: 0.3)
-              : Colors.blue.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.blue.withValues(alpha: 0.2)
-                : Colors.blue.withValues(alpha: 0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: AppTheme.primaryColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: _MenuRow(
+          icon: icon,
+          color: color,
+          title: title,
+          subtitle: subtitle,
+          titleColor: titleColor,
+          trailing: showChevron
+              ? const Icon(
                   Icons.chevron_right_rounded,
                   color: AppTheme.textSecondary,
-                  size: 20,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? subtitle;
+  final Color? titleColor;
+  final Widget? trailing;
+
+  const _MenuRow({
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.subtitle,
+    this.titleColor,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          IconBadge(icon: icon, color: color, size: 38, iconSize: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: titleColor,
+                  ),
                 ),
+                if (subtitle != null)
+                  Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
-        ),
+          ?trailing,
+        ],
       ),
     );
   }

@@ -13,6 +13,9 @@ class SaleModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
+  /// Excess cash found at day close, booked as a forgotten sale.
+  final bool isAdjustment;
+
   SaleModel({
     required this.id,
     required this.productName,
@@ -23,6 +26,7 @@ class SaleModel {
     required this.createdBy,
     required this.createdAt,
     this.updatedAt,
+    this.isAdjustment = false,
   });
 
   factory SaleModel.fromFirestore(DocumentSnapshot doc) {
@@ -39,6 +43,7 @@ class SaleModel {
       createdBy: data['createdBy'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      isAdjustment: data['isAdjustment'] == true,
     );
   }
 
@@ -52,6 +57,7 @@ class SaleModel {
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      if (isAdjustment) 'isAdjustment': true,
     };
   }
 
@@ -87,6 +93,7 @@ class SaleModel {
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isAdjustment: isAdjustment,
     );
   }
 

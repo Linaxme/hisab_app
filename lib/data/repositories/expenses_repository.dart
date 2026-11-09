@@ -101,7 +101,7 @@ class ExpensesRepository {
       {'name': 'মাল কেনা', 'order': 3, 'subcategories': []},
       {'name': 'যাতায়াত', 'order': 4, 'subcategories': []},
       {'name': 'কিস্তি', 'order': 5, 'subcategories': []},
-      {'name': 'সঞ্চয়', 'order': 6, 'subcategories': []},
+      {'name': 'সঞ্চয়', 'order': 6, 'subcategories': [], 'isSavings': true},
       {'name': 'ব্যক্তিগত', 'order': 7, 'subcategories': []},
       {'name': 'অন্যান্য', 'order': 8, 'subcategories': []},
     ];
@@ -114,6 +114,7 @@ class ExpensesRepository {
         'name': category['name'],
         'order': category['order'],
         'createdAt': FieldValue.serverTimestamp(),
+        if (category['isSavings'] == true) 'isSavings': true,
       });
 
       final subcategories = category['subcategories'] as List<String>;
@@ -168,6 +169,10 @@ class ExpensesRepository {
   // Update category
   Future<void> updateCategory(String categoryId, String name) async {
     await _categoriesCollection.doc(categoryId).update({'name': name});
+  }
+
+  Future<void> setCategorySavings(String categoryId, bool isSavings) async {
+    await _categoriesCollection.doc(categoryId).update({'isSavings': isSavings});
   }
 
   // Delete category

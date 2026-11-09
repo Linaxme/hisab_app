@@ -144,7 +144,7 @@ class ProductsSettingsScreen extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
-            child: const Text('যোগ করুন', style: TextStyle(color: Colors.white)),
+            child: const Text('যোগ করুন', style: TextStyle(color: AppTheme.onPrimary)),
           ),
         ],
       ),
@@ -209,7 +209,7 @@ class ProductsSettingsScreen extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
-            child: const Text('সেভ করুন', style: TextStyle(color: Colors.white)),
+            child: const Text('সেভ করুন', style: TextStyle(color: AppTheme.onPrimary)),
           ),
         ],
       ),

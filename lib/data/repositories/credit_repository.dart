@@ -63,6 +63,13 @@ class CreditRepository {
     return null;
   }
 
+  // Watch single credit sale
+  Stream<CreditSaleModel?> watchCreditSale(String id) {
+    return _creditSalesCollection.doc(id).snapshots().map(
+          (doc) => doc.exists ? CreditSaleModel.fromFirestore(doc) : null,
+        );
+  }
+
   // Update credit sale
   Future<void> updateCreditSale(CreditSaleModel creditSale) async {
     await _creditSalesCollection.doc(creditSale.id).update(creditSale.toUpdateFirestore());
@@ -135,6 +142,22 @@ class CreditRepository {
   }
 
   // ============ SUMMARY ============
+
+  // Credit summary via aggregate queries: one read per 1000 credit sales instead of one per sale
+  Future<Map<String, double>> getCreditSummaryAggregate() async {
+    // Separate queries so each runs on the automatic single-field index.
+    final results = await Future.wait([
+      _creditSalesCollection.aggregate(sum('amount')).get(),
+      _creditSalesCollection.aggregate(sum('collectedAmount')).get(),
+    ]);
+    final totalCredit = results[0].getSum('amount') ?? 0;
+    final totalCollected = results[1].getSum('collectedAmount') ?? 0;
+    return {
+      'totalCredit': totalCredit,
+      'totalCollected': totalCollected,
+      'remaining': totalCredit - totalCollected,
+    };
+  }
 
   // Get credit summary
   Future<Map<String, double>> getCreditSummary() async {

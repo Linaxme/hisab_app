@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
+import '../widgets/auth_scaffold.dart';
 
 class CreateShopScreen extends ConsumerStatefulWidget {
   const CreateShopScreen({super.key});
@@ -62,171 +63,69 @@ class _CreateShopScreenState extends ConsumerState<CreateShopScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(languageProvider);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Icon
-                    Icon(
-                      Icons.store_mall_directory,
-                      size: 80,
-                      color: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(height: 24),
 
-                    // Title
-                    Text(
-                      tr(locale, 'create_shop'),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Set up your shop to start managing your business',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Error Message
-                    if (_errorMessage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: AppTheme.errorColor,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(color: AppTheme.errorColor),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Shop Name Field
-                    TextFormField(
-                      controller: _shopNameController,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _createShop(),
-                      decoration: InputDecoration(
-                        labelText: tr(locale, 'shop_name'),
-                        prefixIcon: const Icon(Icons.storefront),
-                        hintText: tr(locale, 'shop_name_hint'),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your shop name';
-                        }
-                        if (value.length < 2) {
-                          return 'Shop name must be at least 2 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Create Button
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _createShop,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                tr(locale, 'create_shop_button'),
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Info Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppTheme.primaryColor,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'What happens next?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'After creating your shop, you\'ll get an invite code that you can share with your staff members.',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Logout Button
-                    TextButton.icon(
-                      onPressed: () async {
-                        await ref.read(authRepositoryProvider).signOut();
-                      },
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
-                    ),
-                  ],
+    return AuthScaffold(
+      icon: Icons.add_business_rounded,
+      title: tr(locale, 'create_shop'),
+      subtitle: 'Set up your shop to start managing your business',
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_errorMessage != null) ...[
+                AuthErrorBanner(message: _errorMessage!),
+                const SizedBox(height: 16),
+              ],
+              TextFormField(
+                controller: _shopNameController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _createShop(),
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'shop_name'),
+                  prefixIcon: const Icon(Icons.storefront_rounded),
+                  hintText: tr(locale, 'shop_name_hint'),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your shop name';
+                  }
+                  if (value.length < 2) {
+                    return 'Shop name must be at least 2 characters';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              GradientButton(
+                label: tr(locale, 'create_shop_button'),
+                icon: Icons.arrow_forward_rounded,
+                isLoading: _isLoading,
+                onPressed: _createShop,
+              ),
+              const SizedBox(height: 20),
+              const AuthInfoTile(
+                icon: Icons.lightbulb_rounded,
+                color: AppTheme.primaryColor,
+                title: 'What happens next?',
+                message:
+                    'After creating your shop, you\'ll get an invite code that you can share with your staff members.',
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                icon: const Icon(Icons.logout_rounded),
+                label: Text(tr(locale, 'logout')),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
                 ),
               ),
-            ),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

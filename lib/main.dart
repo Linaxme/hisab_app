@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
-import 'core/providers/theme_provider.dart';
 import 'core/providers/dashboard_preferences_provider.dart';
 import 'core/providers/language_provider.dart';
 
@@ -59,14 +58,13 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(languageProvider);
     
     return MaterialApp.router(
       title: 'Shop Accounting',
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: themeMode,
+      themeMode: ThemeMode.dark,
       locale: locale,
       supportedLocales: const [
         Locale('bn'),

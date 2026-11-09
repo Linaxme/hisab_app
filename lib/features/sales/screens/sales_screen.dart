@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/localization/strings.dart';
@@ -6,6 +7,9 @@ import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/models.dart';
+import '../../../widgets/amount_keypad.dart';
+import '../../../widgets/entry_form.dart';
+import '../../../widgets/modern_widgets.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -46,81 +50,36 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        t('sales_title'),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const Spacer(),
-                      _LanguageSwitch(locale: locale),
-                      const SizedBox(width: 12),
-                      // Date Picker
-                      InkWell(
+                  ScreenHeader(
+                    title: t('sales_title'),
+                    actions: [
+                      DateChip(
+                        label: _formatDate(selectedDate, t),
                         onTap: () => _selectDate(context, ref),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 18,
-                                color: AppTheme.primaryColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDate(selectedDate, t),
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        color: AppTheme.successColor,
                       ),
                     ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ).animate().fadeIn().slideX(begin: -0.05),
                   const SizedBox(height: 16),
 
-                  // Totals Row
+                  // Totals banner
                   totals.when(
-                    data: (data) => Row(
-                      children: [
-                        Expanded(
-                          child: _TotalCard(
-                            label: t('total_sales'),
-                            value: CurrencyFormatter.formatNoDecimal(
-                              data['totalSales'] ?? 0,
-                            ),
-                            gradient: AppTheme.successGradient,
-                          ),
-                        ),
-                        if (showProfit) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _TotalCard(
-                              label: t('total_profit'),
-                              value: CurrencyFormatter.formatNoDecimal(
-                                data['totalProfit'] ?? 0,
-                              ),
-                              gradient: AppTheme.purpleGradient,
-                              amountColor: Colors.purple,
-                            ),
-                          ),
-                        ],
-                      ],
+                    data: (data) => TotalBanner(
+                      label: t('total_sales'),
+                      value: CurrencyFormatter.formatNoDecimal(
+                        data['totalSales'] ?? 0,
+                      ),
+                      icon: Icons.point_of_sale_rounded,
+                      gradient: AppTheme.successGradient,
+                      trailingLabel: showProfit ? t('total_profit') : null,
+                      trailingValue: showProfit
+                          ? CurrencyFormatter.formatNoDecimal(
+                              data['totalProfit'] ?? 0,
+                            )
+                          : null,
                     ).animate().fadeIn(delay: 100.ms),
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -141,9 +100,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                               },
                             ),
                       isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                     ),
                   ),
                 ],
@@ -170,7 +126,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: filteredSales.length,
                     itemBuilder: (context, index) {
                       final sale = filteredSales[index];
@@ -194,12 +150,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showSaleForm(context),
-        backgroundColor: AppTheme.successColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(t('add_sale'), style: const TextStyle(color: Colors.white)),
-      ).animate().slideY(begin: 1, delay: 300.ms).fadeIn(),
     );
   }
 
@@ -231,12 +181,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   void _showSaleForm(BuildContext context, {SaleModel? sale}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _SaleFormSheet(sale: sale),
-    );
+    showEntryForm(context, SaleFormSheet(sale: sale));
   }
 
   Future<void> _deleteSale(SaleModel sale) async {
@@ -298,69 +243,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         }
       }
     }
-  }
-}
-
-class _TotalCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final LinearGradient gradient;
-  final Color? amountColor;
-
-  const _TotalCard({
-    required this.label,
-    required this.value,
-    required this.gradient,
-    this.amountColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.4), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: amountColor ?? AppTheme.successColor,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -450,39 +332,6 @@ class _EmptySearchState extends StatelessWidget {
   }
 }
 
-class _LanguageSwitch extends ConsumerWidget {
-  const _LanguageSwitch({required this.locale});
-
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(languageProvider.notifier);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.4)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: locale.languageCode,
-          items: const [
-            DropdownMenuItem(value: 'bn', child: Text('বাংলা')),
-            DropdownMenuItem(value: 'en', child: Text('English')),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              notifier.setLanguage(value);
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class _SaleCard extends StatelessWidget {
   final SaleModel sale;
   final bool showProfit;
@@ -500,223 +349,143 @@ class _SaleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final t = (String key, {Map<String, String> params = const {}}) =>
         tr(locale, key, params: params);
-    final paymentLabel = sale.isCash ? t('cash') : t('bkash');
+    final paymentLabel = sale.isCash ? t('cash') : t('digital');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.blue.withValues(alpha: 0.3)
-              : Colors.blue.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.blue.withValues(alpha: 0.2)
-                : Colors.blue.withValues(alpha: 0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
+    return EntryCard(
+      icon: Icons.shopping_bag_rounded,
+      color: AppTheme.successColor,
+      title: sale.productName.isEmpty ? t('sales_title') : sale.productName,
+      subtitle: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          StatusPill(
+            label: paymentLabel,
+            color: sale.isCash ? AppTheme.successColor : AppTheme.infoColor,
+            icon: sale.isCash ? Icons.payments_rounded : Icons.phone_android_rounded,
           ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+          if (showProfit)
+            Text(
+              t(
+                'profit_prefix',
+                params: {'amount': CurrencyFormatter.formatNoDecimal(sale.profit)},
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                // Product icon
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_bag_rounded,
-                    color: AppTheme.successColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sale.productName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: sale.isCash
-                                  ? AppTheme.successColor.withValues(alpha: 0.1)
-                                  : AppTheme.primaryColor.withValues(
-                                      alpha: 0.1,
-                                    ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              paymentLabel,
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: sale.isCash
-                                    ? AppTheme.successColor
-                                    : AppTheme.primaryColor,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          if (showProfit) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              t(
-                                'profit_prefix',
-                                params: {
-                                  'amount': CurrencyFormatter.formatNoDecimal(
-                                    sale.profit,
-                                  ),
-                                },
-                              ),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Price and actions
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      CurrencyFormatter.formatNoDecimal(sale.sellPrice),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: AppTheme.successColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: onEdit,
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            size: 16,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: onDelete,
-                          child: const Icon(
-                            Icons.delete_rounded,
-                            size: 16,
-                            color: AppTheme.errorColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      amount: CurrencyFormatter.formatNoDecimal(sale.sellPrice),
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
 
-class _SaleFormSheet extends ConsumerStatefulWidget {
+enum _AmountField { price, profit }
+
+/// Calculator-style sale entry: big amount, product chips and a number pad.
+class SaleFormSheet extends ConsumerStatefulWidget {
   final SaleModel? sale;
 
-  const _SaleFormSheet({this.sale});
+  const SaleFormSheet({super.key, this.sale});
 
   @override
-  ConsumerState<_SaleFormSheet> createState() => _SaleFormSheetState();
+  ConsumerState<SaleFormSheet> createState() => _SaleFormSheetState();
 }
 
-class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _productNameController = TextEditingController();
-  final _sellPriceController = TextEditingController();
-  final _profitController = TextEditingController();
+class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
+  final _productController = TextEditingController();
+  final _productFocus = FocusNode();
+  final _keyboardFocus = FocusNode();
+  String _price = '';
+  String _profit = '';
+  _AmountField _active = _AmountField.price;
   PaymentType _paymentType = PaymentType.cash;
+  String? _selectedProduct;
+  bool _typingProduct = false;
   bool _isLoading = false;
-  String? _selectedProductName;
+  bool _showError = false;
+  int _savedCount = 0;
+
+  bool get _isEdit => widget.sale != null;
+
+  static String _digits(double value) => value > 0 ? value.toStringAsFixed(0) : '';
 
   @override
   void initState() {
     super.initState();
-    if (widget.sale != null) {
-      _selectedProductName = widget.sale!.productName.isNotEmpty
-          ? widget.sale!.productName
-          : null;
-      _productNameController.text = widget.sale!.productName;
-      _sellPriceController.text = widget.sale!.sellPrice.toStringAsFixed(0);
-      _profitController.text = widget.sale!.profit.toStringAsFixed(0);
-      _paymentType = widget.sale!.paymentType;
+    final sale = widget.sale;
+    if (sale != null) {
+      _price = _digits(sale.sellPrice);
+      _profit = _digits(sale.profit);
+      _paymentType = sale.paymentType;
+      _selectedProduct = sale.productName.isNotEmpty ? sale.productName : null;
     }
   }
 
   @override
   void dispose() {
-    _productNameController.dispose();
-    _sellPriceController.dispose();
-    _profitController.dispose();
+    _productController.dispose();
+    _productFocus.dispose();
+    _keyboardFocus.dispose();
     super.dispose();
   }
 
-  String paymentLabelFromType(
-    String Function(String, {Map<String, String> params}) t,
-    PaymentType type,
-  ) {
-    return type == PaymentType.cash ? t('cash') : t('bkash');
+  void _press(String key) {
+    setState(() {
+      _showError = false;
+      if (_active == _AmountField.price) {
+        _price = applyKeypadKey(_price, key);
+      } else {
+        _profit = applyKeypadKey(_profit, key);
+      }
+    });
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _clearActive() {
+    setState(() {
+      if (_active == _AmountField.price) {
+        _price = '';
+      } else {
+        _profit = '';
+      }
+    });
+  }
 
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (_productFocus.hasFocus) return KeyEventResult.ignored;
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+      _save();
+      return KeyEventResult.handled;
+    }
+    final key = keypadKeyFor(event);
+    if (key == null) return KeyEventResult.ignored;
+    _press(key);
+    return KeyEventResult.handled;
+  }
+
+  String get _productName =>
+      _typingProduct ? _productController.text.trim() : (_selectedProduct ?? '');
+
+  Future<void> _save({bool next = false}) async {
+    if (_isLoading) return;
     final locale = ref.read(languageProvider);
-    final t = (String key, {Map<String, String> params = const {}}) =>
+    String t(String key, {Map<String, String> params = const {}}) =>
         tr(locale, key, params: params);
+
+    final price = double.tryParse(_price) ?? 0;
+    if (price <= 0) {
+      setState(() {
+        _showError = true;
+        _active = _AmountField.price;
+      });
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -732,67 +501,60 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
       final dateStr = widget.sale?.date ?? formatDateForQuery(selectedDate);
       final sale = SaleModel(
         id: widget.sale?.id ?? '',
-        productName: _selectedProductName ?? _productNameController.text.trim(),
-        sellPrice: double.parse(_sellPriceController.text),
-        profit: double.tryParse(_profitController.text) ?? 0,
+        productName: _productName,
+        sellPrice: price,
+        profit: double.tryParse(_profit) ?? 0,
         paymentType: _paymentType,
         date: dateStr,
         createdBy: currentUser.uid,
         createdAt: widget.sale?.createdAt ?? DateTime.now(),
       );
 
-      // A non-cash sale is mirrored by an auto-created deposit
+      // A digital sale is mirrored by an auto-created deposit
       final autoDeposit = sale.isCash
           ? null
           : DepositModel(
               id: '',
               amount: sale.sellPrice,
-              note: t(
-                'sale_note',
-                params: {
-                  'product': sale.productName,
-                  'payment': paymentLabelFromType(t, sale.paymentType),
-                },
-              ),
+              note: t('sale_note', params: {'product': sale.productName, 'payment': t('digital')}),
               date: dateStr,
               createdBy: currentUser.uid,
               createdAt: DateTime.now(),
               isAutoCreated: true,
             );
 
-      if (widget.sale == null) {
-        await repository.addSale(sale, autoDeposit: autoDeposit);
+      if (_isEdit) {
+        await repository.updateSale(widget.sale!, sale, autoDeposit: autoDeposit);
       } else {
-        await repository.updateSale(
-          widget.sale!,
-          sale,
-          autoDeposit: autoDeposit,
-        );
+        await repository.addSale(sale, autoDeposit: autoDeposit);
       }
 
-      // Refresh providers to update UI
-      ref.invalidate(salesByDateProvider);
       ref.invalidate(salesTotalsProvider);
-      ref.invalidate(depositsByDateProvider);
       ref.invalidate(depositsTotalProvider);
       ref.invalidate(liveCashProvider);
 
-      if (mounted) {
+      if (!mounted) return;
+      if (next) {
+        setState(() {
+          _price = '';
+          _profit = '';
+          _active = _AmountField.price;
+          _selectedProduct = null;
+          _typingProduct = false;
+          _productController.clear();
+          _savedCount++;
+        });
+        _keyboardFocus.requestFocus();
+      } else {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.sale == null ? t('sale_added') : t('sale_updated'),
-            ),
-          ),
+          SnackBar(content: Text(_isEdit ? t('sale_updated') : t('sale_added'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t('error_with_message', params: {'message': '$e'})),
-          ),
+          SnackBar(content: Text(t('error_with_message', params: {'message': '$e'}))),
         );
       }
     } finally {
@@ -800,255 +562,398 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
     }
   }
 
+  List<String> _productChips() {
+    final today = ref.watch(salesByDateProvider).valueOrNull ?? const <SaleModel>[];
+    final products = ref.watch(productsProvider).valueOrNull ?? const <ProductModel>[];
+    return {
+      ?_selectedProduct,
+      for (final s in today)
+        if (s.productName.isNotEmpty) s.productName,
+      for (final p in products)
+        if (p.active) p.name,
+    }.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(languageProvider);
-    final t = (String key, {Map<String, String> params = const {}}) =>
-        tr(locale, key, params: params);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Allow profit input for all roles so staff can record profit; keep profit visibility restricted elsewhere
-    final allowProfitInput = true;
+    String t(String key) => tr(locale, key);
+    final digital = _paymentType == PaymentType.noncash;
+    final accent = digital ? AppTheme.infoColor : AppTheme.successColor;
+    final chips = _productChips();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBackground : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
+    return Focus(
+      focusNode: _keyboardFocus,
+      autofocus: true,
+      onKeyEvent: _onKey,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppTheme.darkSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SheetHandle(),
+                Row(
+                  children: [
+                    Text(
+                      _isEdit ? t('edit_sale') : t('new_sale'),
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const Spacer(),
+                    if (_savedCount > 0)
+                      StatusPill(
+                        label: '✓ $_savedCount',
+                        color: AppTheme.successColor,
+                      ).animate(key: ValueKey(_savedCount)).scale(curve: Curves.easeOutBack),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Amount display
+                _AmountDisplay(
+                  priceLabel: t('sell_price'),
+                  profitLabel: t('profit'),
+                  price: _price,
+                  profit: _profit,
+                  active: _active,
+                  accent: accent,
+                  error: _showError ? t('enter_sell_price') : null,
+                  onSelect: (field) => setState(() => _active = field),
+                ),
+                const SizedBox(height: 14),
+
+                // Product chips
+                SizedBox(
+                  height: 38,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _Chip(
+                        label: t('new_product'),
+                        icon: Icons.add_rounded,
+                        selected: _typingProduct,
+                        onTap: () {
+                          setState(() {
+                            _typingProduct = !_typingProduct;
+                            if (_typingProduct) _selectedProduct = null;
+                          });
+                          if (_typingProduct) _productFocus.requestFocus();
+                        },
+                      ),
+                      for (final name in chips)
+                        _Chip(
+                          label: name,
+                          selected: !_typingProduct && _selectedProduct == name,
+                          onTap: () => setState(() {
+                            _typingProduct = false;
+                            _selectedProduct = _selectedProduct == name ? null : name;
+                          }),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_typingProduct) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _productController,
+                    focusNode: _productFocus,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _keyboardFocus.requestFocus(),
+                    decoration: InputDecoration(
+                      hintText: t('enter_new_product'),
+                      prefixIcon: const Icon(Icons.inventory_2_rounded),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+
+                // Payment type
+                Container(
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    color: AppTheme.darkCard,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      _PaymentSegment(
+                        label: t('cash'),
+                        icon: Icons.payments_rounded,
+                        color: AppTheme.successColor,
+                        selected: !digital,
+                        onTap: () => setState(() => _paymentType = PaymentType.cash),
+                      ),
+                      _PaymentSegment(
+                        label: t('digital'),
+                        icon: Icons.phone_android_rounded,
+                        color: AppTheme.infoColor,
+                        selected: digital,
+                        onTap: () => setState(() => _paymentType = PaymentType.noncash),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
-              // Title
-              Text(
-                widget.sale == null ? t('new_sale') : t('edit_sale'),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
+                AmountKeypad(onKey: _press, onClear: _clearActive),
+                const SizedBox(height: 14),
 
-              // Product Name Dropdown/Combo
-              Consumer(
-                builder: (context, ref, child) {
-                  final productsAsync = ref.watch(productsProvider);
-
-                  return productsAsync.when(
-                    data: (products) {
-                      // Dropdown values must be unique and must include the current value
-                      final productNames = {
-                        ...products.map((p) => p.name),
-                        ?_selectedProductName,
-                      }.toList();
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedProductName,
-                            decoration: InputDecoration(
-                              labelText: t('product_name_optional'),
-                              prefixIcon: const Icon(Icons.inventory_2_rounded),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            items: [
-                              DropdownMenuItem<String>(
-                                value: null,
-                                child: Text(t('select_or_type_product')),
-                              ),
-                              ...productNames.map(
-                                (name) => DropdownMenuItem(
-                                  value: name,
-                                  child: Text(name),
-                                ),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedProductName = value;
-                                if (value != null) {
-                                  _productNameController.text = value;
-                                }
-                              });
-                            },
+                // Actions
+                Row(
+                  children: [
+                    if (!_isEdit) ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : () => _save(next: true),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(54),
+                            side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+                            foregroundColor: AppTheme.primaryColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
-                          if (_selectedProductName == null) ...[
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _productNameController,
-                              decoration: InputDecoration(
-                                labelText: t('enter_new_product'),
-                                prefixIcon: const Icon(Icons.edit_rounded),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                          child: Text(
+                            t('save_and_next'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _isLoading ? null : _save,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: AppTheme.onPrimary,
                                 ),
-                                helperText: t('optional_hint'),
+                              )
+                            : Text(
+                                _isEdit ? t('update') : t('save'),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                               ),
-                            ),
-                          ],
-                        ],
-                      );
-                    },
-                    loading: () => TextFormField(
-                      controller: _productNameController,
-                      decoration: InputDecoration(
-                        labelText: t('product_name_optional'),
-                        prefixIcon: const Icon(Icons.inventory_2_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
                     ),
-                    error: (_, __) => TextFormField(
-                      controller: _productNameController,
-                      decoration: InputDecoration(
-                        labelText: t('product_name_optional'),
-                        prefixIcon: const Icon(Icons.inventory_2_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Sell Price
-              TextFormField(
-                controller: _sellPriceController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: t('sell_price'),
-                  prefixIcon: const Icon(Icons.attach_money_rounded),
-                  prefixText: '৳ ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return t('enter_sell_price');
-                  }
-                  if (double.tryParse(value) == null) {
-                    return t('invalid_price');
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Profit input (available to staff; profit visibility still owner-only elsewhere)
-              if (allowProfitInput) ...[
-                TextFormField(
-                  controller: _profitController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: t('profit'),
-                    prefixIcon: const Icon(Icons.trending_up_rounded),
-                    prefixText: '৳ ',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              // Payment Type
-              Text(
-                t('payment_type'),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
+class _AmountDisplay extends StatelessWidget {
+  final String priceLabel;
+  final String profitLabel;
+  final String price;
+  final String profit;
+  final _AmountField active;
+  final Color accent;
+  final String? error;
+  final ValueChanged<_AmountField> onSelect;
+
+  const _AmountDisplay({
+    required this.priceLabel,
+    required this.profitLabel,
+    required this.price,
+    required this.profit,
+    required this.active,
+    required this.accent,
+    required this.error,
+    required this.onSelect,
+  });
+
+  static String _format(String digits) =>
+      CurrencyFormatter.formatNoDecimal(double.tryParse(digits) ?? 0);
+
+  @override
+  Widget build(BuildContext context) {
+    final priceActive = active == _AmountField.price;
+    final borderColor = error != null
+        ? AppTheme.errorColor
+        : (priceActive ? accent : Colors.white.withValues(alpha: 0.08));
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.12), AppTheme.darkCard],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: borderColor, width: priceActive ? 1.5 : 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onSelect(_AmountField.price),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _PaymentTypeButton(
-                      label: t('cash'),
-                      icon: Icons.money_rounded,
-                      isSelected: _paymentType == PaymentType.cash,
-                      onTap: () =>
-                          setState(() => _paymentType = PaymentType.cash),
+                  Text(
+                    error ?? priceLabel,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: error != null ? AppTheme.errorColor : AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _PaymentTypeButton(
-                      label: t('bkash'),
-                      icon: Icons.credit_card_rounded,
-                      isSelected: _paymentType == PaymentType.noncash,
-                      onTap: () =>
-                          setState(() => _paymentType = PaymentType.noncash),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _format(price),
+                      style: AppTheme.numeric(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.5,
+                        color: price.isEmpty ? AppTheme.textSecondary.withValues(alpha: 0.5) : Colors.white,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.successGradient,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            widget.sale == null ? t('add') : t('update'),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () => onSelect(_AmountField.profit),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.violetColor.withValues(alpha: priceActive ? 0.08 : 0.18),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: priceActive
+                      ? AppTheme.violetColor.withValues(alpha: 0.25)
+                      : AppTheme.violetColor,
+                  width: priceActive ? 1 : 1.5,
                 ),
               ),
-              const SizedBox(height: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    profitLabel,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.violetColor, fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    _format(profit),
+                    style: AppTheme.numeric(fontSize: 16, color: AppTheme.violetColor),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _Chip({required this.label, required this.selected, required this.onTap, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? AppTheme.onPrimary : AppTheme.darkTextPrimary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: selected ? AppTheme.primaryColor : AppTheme.darkCard,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const StadiumBorder(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 16, color: selected ? fg : AppTheme.primaryColor),
+                  const SizedBox(width: 4),
+                ],
+                Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentSegment extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PaymentSegment({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? AppTheme.onPrimary : AppTheme.textSecondary;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 44,
+          decoration: BoxDecoration(
+            color: selected ? color : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: selected ? AppTheme.softShadow(color) : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w800)),
             ],
           ),
         ),
@@ -1057,56 +962,3 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
   }
 }
 
-class _PaymentTypeButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PaymentTypeButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: isSelected ? AppTheme.successGradient : null,
-          color: isSelected
-              ? null
-              : (isDark ? AppTheme.darkCard : Colors.grey.shade100),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.shade300,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : AppTheme.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

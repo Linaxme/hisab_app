@@ -21,7 +21,6 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(t('settings_title')),
       ),
-      drawer: const AppDrawer(),
       body: currentShop.when(
         data: (shop) {
           if (shop == null) {

@@ -7,6 +7,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../widgets/entry_form.dart';
+import '../../../widgets/modern_widgets.dart';
 
 class ReturnsScreen extends ConsumerStatefulWidget {
   const ReturnsScreen({super.key});
@@ -67,109 +70,29 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => _handleBack(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr(locale, 'returns_title'),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const Spacer(),
-                      // Date Picker
-                      InkWell(
+                  ScreenHeader(
+                    title: tr(locale, 'returns_title'),
+                    onBack: context.isWide ? null : () => _handleBack(context),
+                    actions: [
+                      DateChip(
+                        label: dateStr,
                         onTap: _pickDate,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 18,
-                                color: AppTheme.errorColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                dateStr,
-                                style: const TextStyle(
-                                  color: AppTheme.errorColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        color: AppTheme.violetColor,
                       ),
                     ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ).animate().fadeIn().slideX(begin: -0.05),
                   const SizedBox(height: 16),
-                  // Total Card
+                  // Total banner
                   totalAsync
                       .when(
-                        data: (total) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          return Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark ? AppTheme.darkCard : Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.blue.withValues(alpha: 0.4),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                  spreadRadius: 1,
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  tr(locale, 'total_returns'),
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  CurrencyFormatter.formatNoDecimal(total),
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.errorColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        data: (total) => TotalBanner(
+                          label: tr(locale, 'total_returns'),
+                          value: CurrencyFormatter.formatNoDecimal(total),
+                          icon: Icons.assignment_return_rounded,
+                          gradient: AppTheme.purpleGradient,
+                        ),
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       )
                       .animate()
                       .fadeIn(delay: 100.ms),
@@ -185,7 +108,7 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
                     return _EmptyState(locale: locale);
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: returns.length,
                     itemBuilder: (context, index) {
                       final returnItem = returns[index];
@@ -211,25 +134,11 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showReturnForm(context),
-        backgroundColor: AppTheme.errorColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          tr(locale, 'add_return'),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ).animate().slideY(begin: 1, delay: 300.ms).fadeIn(),
     );
   }
 
   void _showReturnForm(BuildContext context, {ReturnModel? returnItem}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ReturnFormSheet(returnItem: returnItem),
-    );
+    showEntryForm(context, ReturnFormSheet(returnItem: returnItem));
   }
 
   Future<void> _deleteReturn(ReturnModel returnItem) async {
@@ -345,128 +254,31 @@ class _ReturnCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return EntryCard(
+      icon: Icons.assignment_return_rounded,
+      color: AppTheme.violetColor,
+      title: returnItem.note ?? tr(locale, 'return_default_note'),
+      subtitle: Text(
+        returnItem.date,
+        style: Theme.of(context).textTheme.bodySmall,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Icon
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.assignment_return_rounded,
-                    color: AppTheme.errorColor,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        returnItem.note ?? tr(locale, 'return_default_note'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        returnItem.date,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Amount
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      CurrencyFormatter.formatNoDecimal(returnItem.amount),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: AppTheme.errorColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: onEdit,
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.edit_rounded,
-                              size: 18,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: onDelete,
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.delete_rounded,
-                              size: 18,
-                              color: AppTheme.errorColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      amount: CurrencyFormatter.formatNoDecimal(returnItem.amount),
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
 
-class _ReturnFormSheet extends ConsumerStatefulWidget {
+class ReturnFormSheet extends ConsumerStatefulWidget {
   final ReturnModel? returnItem;
 
-  const _ReturnFormSheet({this.returnItem});
+  const ReturnFormSheet({super.key, this.returnItem});
 
   @override
-  ConsumerState<_ReturnFormSheet> createState() => _ReturnFormSheetState();
+  ConsumerState<ReturnFormSheet> createState() => _ReturnFormSheetState();
 }
 
-class _ReturnFormSheetState extends ConsumerState<_ReturnFormSheet> {
+class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
@@ -578,17 +390,7 @@ class _ReturnFormSheetState extends ConsumerState<_ReturnFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SheetHandle(),
               const SizedBox(height: 20),
 
               // Title

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_formatter.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/localization/strings.dart';
 import '../../../widgets/modern_widgets.dart';
 import '../../../widgets/skeleton_loader.dart';
@@ -340,7 +341,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 child: const Text(
                   'পরিবর্তন করুন',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppTheme.onPrimary),
                 ),
               ),
             ),
@@ -378,32 +379,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 children: [
                   // Header
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => context.pop(),
-                        icon: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkCard : Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.arrow_back_rounded),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'প্রোফাইল',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                    ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ScreenHeader(
+                    title: 'প্রোফাইল',
+                    onBack: context.isWide
+                        ? null
+                        : () => context.canPop()
+                            ? context.pop()
+                            : context.go('/more'),
+                  ).animate().fadeIn().slideX(begin: -0.05),
 
                   const SizedBox(height: 32),
 
@@ -430,7 +413,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           style: const TextStyle(
                             fontSize: 40,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppTheme.onPrimary,
                           ),
                         ),
                       ),
@@ -536,12 +519,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         width: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          color: AppTheme.onPrimary,
                                         ),
                                       )
                                     : const Text(
                                         'সংরক্ষণ করুন',
-                                        style: TextStyle(color: Colors.white),
+                                        style: TextStyle(color: AppTheme.onPrimary),
                                       ),
                               ),
                             ),
@@ -629,13 +612,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                                 child:
                                                     CircularProgressIndicator(
                                                       strokeWidth: 2,
-                                                      color: Colors.white,
+                                                      color: AppTheme.onPrimary,
                                                     ),
                                               )
                                             : const Text(
                                                 'সংরক্ষণ করুন',
                                                 style: TextStyle(
-                                                  color: Colors.white,
+                                                  color: AppTheme.onPrimary,
                                                 ),
                                               ),
                                       ),
@@ -676,12 +659,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         onPressed: _showChangePasswordDialog,
                         icon: const Icon(
                           Icons.lock_reset_rounded,
-                          color: Colors.white,
+                          color: AppTheme.onPrimary,
                         ),
                         label: const Text(
                           'পাসওয়ার্ড পরিবর্তন করুন',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppTheme.onPrimary,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -764,8 +747,9 @@ class _ProfileTile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient.scale(0.3),
+            color: AppTheme.primaryColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.25)),
           ),
           child: Icon(icon, color: AppTheme.primaryColor),
         ),

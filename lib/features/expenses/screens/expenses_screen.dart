@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
+import '../../../widgets/entry_form.dart';
+import '../../../widgets/modern_widgets.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -28,7 +30,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   Widget build(BuildContext context) {
     final expensesAsync = ref.watch(expensesByDateProvider);
     final selectedDate = ref.watch(selectedDateProvider);
-    final totals = ref.watch(expensesTotalsProvider);
+    final savingsIds = ref.watch(savingsCategoryIdsProvider);
     final locale = ref.watch(languageProvider);
 
     return Scaffold(
@@ -40,79 +42,45 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        tr(locale, 'expenses_title'),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      // Date Picker
-                      InkWell(
+                  ScreenHeader(
+                    title: tr(locale, 'expenses_title'),
+                    actions: [
+                      DateChip(
+                        label: _formatDate(selectedDate),
                         onTap: () => _selectDate(context, ref),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 18,
-                                color: AppTheme.errorColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDate(selectedDate),
-                                style: const TextStyle(
-                                  color: AppTheme.errorColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        color: AppTheme.errorColor,
                       ),
                     ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ).animate().fadeIn().slideX(begin: -0.05),
                   const SizedBox(height: 16),
 
-                  // Totals Row
-                  totals.when(
-                    data: (data) => Row(
-                      children: [
-                        Expanded(
-                          child: _TotalCard(
-                            label: tr(locale, 'total_expenses'),
-                            value: CurrencyFormatter.formatNoDecimal(
-                              data['totalExpenses'] ?? 0,
-                            ),
-                            gradient: AppTheme.errorGradient,
-                            amountColor: AppTheme.errorColor,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _TotalCard(
-                            label: tr(locale, 'cash_expenses'),
-                            value: CurrencyFormatter.formatNoDecimal(
-                              data['cashExpenses'] ?? 0,
-                            ),
-                            gradient: AppTheme.warningGradient,
-                            amountColor: AppTheme.warningColor,
-                          ),
-                        ),
-                      ],
+                  // Totals banner; savings are shown apart from spending
+                  if (expensesAsync.valueOrNull case final expenses?) ...[
+                    TotalBanner(
+                      label: tr(locale, 'total_expenses'),
+                      value: CurrencyFormatter.formatNoDecimal(expenses
+                          .where((e) => !savingsIds.contains(e.categoryId))
+                          .fold<double>(0, (s, e) => s + e.amount)),
+                      icon: Icons.receipt_long_rounded,
+                      gradient: AppTheme.errorGradient,
+                      trailingLabel: tr(locale, 'cash_expenses'),
+                      trailingValue: CurrencyFormatter.formatNoDecimal(expenses
+                          .where((e) => e.isCash && !savingsIds.contains(e.categoryId))
+                          .fold<double>(0, (s, e) => s + e.amount)),
                     ).animate().fadeIn(delay: 100.ms),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
+                    if (expenses.any((e) => savingsIds.contains(e.categoryId)))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: StatusPill(
+                          label: tr(locale, 'savings_total', params: {
+                            'amount': CurrencyFormatter.formatNoDecimal(expenses
+                                .where((e) => savingsIds.contains(e.categoryId))
+                                .fold<double>(0, (s, e) => s + e.amount)),
+                          }),
+                          color: AppTheme.successColor,
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -138,12 +106,13 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                         : _EmptyState(locale: locale);
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: filteredExpenses.length,
                     itemBuilder: (context, index) {
                       final expense = filteredExpenses[index];
                       return _ExpenseCard(
                             expense: expense,
+                            isSavings: savingsIds.contains(expense.categoryId),
                             onEdit: () =>
                                 _showExpenseForm(context, expense: expense),
                             onDelete: () => _deleteExpense(expense),
@@ -161,15 +130,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showExpenseForm(context),
-        backgroundColor: AppTheme.errorColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          tr(locale, 'add_expense_btn'),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ).animate().slideY(begin: 1, delay: 300.ms).fadeIn(),
     );
   }
 
@@ -198,12 +158,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   }
 
   void _showExpenseForm(BuildContext context, {ExpenseModel? expense}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ExpenseFormSheet(expense: expense),
-    );
+    showEntryForm(context, ExpenseFormSheet(expense: expense));
   }
 
   Future<void> _deleteExpense(ExpenseModel expense) async {
@@ -262,69 +217,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         }
       }
     }
-  }
-}
-
-class _TotalCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final LinearGradient gradient;
-  final Color? amountColor;
-
-  const _TotalCard({
-    required this.label,
-    required this.value,
-    required this.gradient,
-    this.amountColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.4), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: amountColor ?? AppTheme.errorColor,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -410,185 +302,66 @@ class _EmptySearchState extends StatelessWidget {
 
 class _ExpenseCard extends StatelessWidget {
   final ExpenseModel expense;
+  final bool isSavings;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _ExpenseCard({
     required this.expense,
+    required this.isSavings,
     required this.onEdit,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final details = [
+      if (expense.subCategoryName != null) expense.subCategoryName!,
+      if (expense.note != null && expense.note!.isNotEmpty) expense.note!,
+    ].join(' · ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.blue.withValues(alpha: 0.3)
-              : Colors.blue.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.blue.withValues(alpha: 0.2)
-                : Colors.blue.withValues(alpha: 0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
+    return EntryCard(
+      icon: isSavings ? Icons.savings_rounded : Icons.receipt_long_rounded,
+      color: isSavings ? AppTheme.successColor : AppTheme.errorColor,
+      title: expense.categoryName,
+      subtitle: Row(
+        children: [
+          StatusPill(
+            label: expense.isCash ? 'ক্যাশ থেকে' : 'ক্যাশের বাইরে',
+            color: isSavings
+                ? AppTheme.successColor
+                : expense.isCash ? AppTheme.errorColor : AppTheme.infoColor,
           ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
+          if (details.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                details,
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                // Category icon - smaller
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: AppTheme.errorColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expense.categoryName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: expense.isCash
-                                  ? AppTheme.errorColor.withValues(alpha: 0.1)
-                                  : AppTheme.primaryColor.withValues(
-                                      alpha: 0.1,
-                                    ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              expense.isCash ? 'নগদ' : 'অ-নগদ',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: expense.isCash
-                                    ? AppTheme.errorColor
-                                    : AppTheme.primaryColor,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          if (expense.subCategoryName != null) ...[
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                expense.subCategoryName!,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: AppTheme.textSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Amount and actions
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      CurrencyFormatter.formatNoDecimal(expense.amount),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: AppTheme.errorColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: onEdit,
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            size: 16,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: onDelete,
-                          child: const Icon(
-                            Icons.delete_rounded,
-                            size: 16,
-                            color: AppTheme.errorColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      amount: CurrencyFormatter.formatNoDecimal(expense.amount),
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
 
-class _ExpenseFormSheet extends ConsumerStatefulWidget {
+class ExpenseFormSheet extends ConsumerStatefulWidget {
   final ExpenseModel? expense;
 
-  const _ExpenseFormSheet({this.expense});
+  const ExpenseFormSheet({super.key, this.expense});
 
   @override
-  ConsumerState<_ExpenseFormSheet> createState() => _ExpenseFormSheetState();
+  ConsumerState<ExpenseFormSheet> createState() => _ExpenseFormSheetState();
 }
 
-class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
+class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
@@ -718,17 +491,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SheetHandle(),
               const SizedBox(height: 20),
 
               // Title
@@ -912,8 +675,8 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                 children: [
                   Expanded(
                     child: _PaymentTypeButton(
-                      label: 'নগদ',
-                      icon: Icons.money_rounded,
+                      label: 'ক্যাশ থেকে',
+                      icon: Icons.point_of_sale_rounded,
                       isSelected: _paymentType == PaymentType.cash,
                       color: AppTheme.errorColor,
                       onTap: () =>
@@ -923,8 +686,8 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _PaymentTypeButton(
-                      label: 'অ-নগদ',
-                      icon: Icons.credit_card_rounded,
+                      label: 'ক্যাশের বাইরে',
+                      icon: Icons.account_balance_wallet_outlined,
                       isSelected: _paymentType == PaymentType.noncash,
                       color: AppTheme.errorColor,
                       onTap: () =>
@@ -1024,11 +787,16 @@ class _PaymentTypeButton extends StatelessWidget {
               color: isSelected ? Colors.white : AppTheme.textSecondary,
             ),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
               ),
             ),
           ],

@@ -40,26 +40,43 @@ final salesRepositoryProvider = Provider<SalesRepository?>((ref) {
   return SalesRepository(shopId: shop.id);
 });
 
+/// Latest sales total of every day seen live this session, newer than any fetched copy.
+final liveDaySalesTotalsProvider = Provider<Map<String, double>>((ref) => {});
+
 final salesByDateProvider = StreamProvider<List<SaleModel>>((ref) {
   final repository = ref.watch(salesRepositoryProvider);
   final date = ref.watch(selectedDateProvider);
   
   if (repository == null) return Stream.value([]);
   
-  return repository.watchSalesByDate(formatDateForQuery(date));
+  final dateStr = formatDateForQuery(date);
+  final liveTotals = ref.read(liveDaySalesTotalsProvider);
+  return repository.watchSalesByDate(dateStr).map((sales) {
+    liveTotals[dateStr] = sales.fold<double>(0, (sum, s) => sum + s.sellPrice);
+    return sales;
+  });
 });
 
-final salesTotalsProvider = FutureProvider.autoDispose<Map<String, double>>((ref) async {
-  ref.cacheFor(const Duration(seconds: 30));
-  
-  final repository = ref.watch(salesRepositoryProvider);
-  final date = ref.watch(selectedDateProvider);
-  
-  if (repository == null) {
-    return {'totalSales': 0, 'totalProfit': 0, 'cashSales': 0, 'nonCashSales': 0};
-  }
-  
-  return repository.getDayTotals(formatDateForQuery(date));
+// Totals are derived from the live streams, so they cost no extra reads.
+final salesTotalsProvider = Provider<AsyncValue<Map<String, double>>>((ref) {
+  return ref.watch(salesByDateProvider).whenData((sales) {
+    double totalSales = 0, totalProfit = 0, cashSales = 0, nonCashSales = 0;
+    for (final sale in sales) {
+      totalSales += sale.sellPrice;
+      totalProfit += sale.profit;
+      if (sale.isCash) {
+        cashSales += sale.sellPrice;
+      } else {
+        nonCashSales += sale.sellPrice;
+      }
+    }
+    return {
+      'totalSales': totalSales,
+      'totalProfit': totalProfit,
+      'cashSales': cashSales,
+      'nonCashSales': nonCashSales,
+    };
+  });
 });
 
 // ============ EXPENSES PROVIDERS ============
@@ -78,23 +95,35 @@ final expensesByDateProvider = StreamProvider<List<ExpenseModel>>((ref) {
   return repository.watchExpensesByDate(formatDateForQuery(date));
 });
 
-final expensesTotalsProvider = FutureProvider.autoDispose<Map<String, double>>((ref) async {
-  ref.cacheFor(const Duration(seconds: 30));
-  
-  final repository = ref.watch(expensesRepositoryProvider);
-  final date = ref.watch(selectedDateProvider);
-  
-  if (repository == null) {
-    return {'totalExpenses': 0, 'cashExpenses': 0, 'nonCashExpenses': 0};
-  }
-  
-  return repository.getDayTotals(formatDateForQuery(date));
+final expensesTotalsProvider = Provider<AsyncValue<Map<String, double>>>((ref) {
+  return ref.watch(expensesByDateProvider).whenData((expenses) {
+    double totalExpenses = 0, cashExpenses = 0, nonCashExpenses = 0;
+    for (final expense in expenses) {
+      totalExpenses += expense.amount;
+      if (expense.isCash) {
+        cashExpenses += expense.amount;
+      } else {
+        nonCashExpenses += expense.amount;
+      }
+    }
+    return {
+      'totalExpenses': totalExpenses,
+      'cashExpenses': cashExpenses,
+      'nonCashExpenses': nonCashExpenses,
+    };
+  });
 });
 
 final expenseCategoriesProvider = StreamProvider<List<ExpenseCategoryModel>>((ref) {
   final repository = ref.watch(expensesRepositoryProvider);
   if (repository == null) return Stream.value([]);
   return repository.watchCategories();
+});
+
+/// Ids of the categories marked as savings; their expenses stay out of expense totals.
+final savingsCategoryIdsProvider = Provider<Set<String>>((ref) {
+  final categories = ref.watch(expenseCategoriesProvider).valueOrNull ?? const [];
+  return {for (final c in categories) if (c.isSavings) c.id};
 });
 
 final expenseSubcategoriesProvider = StreamProvider.family<List<ExpenseSubCategoryModel>, String>((ref, categoryId) {
@@ -116,21 +145,52 @@ final creditSalesProvider = StreamProvider<List<CreditSaleModel>>((ref) {
   return repository.watchCreditSales();
 });
 
-final pendingCreditSalesProvider = StreamProvider<List<CreditSaleModel>>((ref) {
-  final repository = ref.watch(creditRepositoryProvider);
-  if (repository == null) return Stream.value([]);
-  return repository.watchCreditSales(pendingOnly: true);
+// Filtered from the all-credits listener instead of opening a second one.
+final pendingCreditSalesProvider = Provider<AsyncValue<List<CreditSaleModel>>>((ref) {
+  return ref.watch(creditSalesProvider).whenData(
+        (sales) => sales.where((s) => !s.isFullyPaid).toList(),
+      );
 });
 
-final creditSummaryProvider = FutureProvider.autoDispose<Map<String, double>>((ref) async {
-  ref.cacheFor(const Duration(seconds: 30));
-  
+/// One credit sale, live; used where only a few are needed (e.g. names in the timeline).
+final creditSaleByIdProvider =
+    StreamProvider.autoDispose.family<CreditSaleModel?, String>((ref, id) {
   final repository = ref.watch(creditRepositoryProvider);
-  if (repository == null) {
-    return {'totalCredit': 0, 'totalCollected': 0, 'remaining': 0};
-  }
-  return repository.getCreditSummary();
+  if (repository == null) return Stream.value(null);
+  return repository.watchCreditSale(id);
 });
+
+final creditSalesByDateProvider = StreamProvider<List<CreditSaleModel>>((ref) {
+  final repository = ref.watch(creditRepositoryProvider);
+  final date = ref.watch(selectedDateProvider);
+  if (repository == null) return Stream.value([]);
+  return repository.watchCreditSalesByDate(formatDateForQuery(date));
+});
+
+final collectionsByDateProvider = StreamProvider<List<CreditCollectionModel>>((ref) {
+  final repository = ref.watch(creditRepositoryProvider);
+  final date = ref.watch(selectedDateProvider);
+  if (repository == null) return Stream.value([]);
+  return repository.watchCollectionsByDate(formatDateForQuery(date));
+});
+
+final creditSummaryProvider = Provider<AsyncValue<Map<String, double>>>((ref) {
+  return ref.watch(creditSalesProvider).whenData(summarizeCredits);
+});
+
+Map<String, double> summarizeCredits(List<CreditSaleModel> creditSales) {
+  double totalCredit = 0;
+  double totalCollected = 0;
+  for (final sale in creditSales) {
+    totalCredit += sale.amount;
+    totalCollected += sale.collectedAmount;
+  }
+  return {
+    'totalCredit': totalCredit,
+    'totalCollected': totalCollected,
+    'remaining': totalCredit - totalCollected,
+  };
+}
 
 // ============ DEPOSITS PROVIDERS ============
 final depositsRepositoryProvider = Provider<DepositsRepository?>((ref) {
@@ -148,15 +208,10 @@ final depositsByDateProvider = StreamProvider<List<DepositModel>>((ref) {
   return repository.watchDepositsByDate(formatDateForQuery(date));
 });
 
-final depositsTotalProvider = FutureProvider.autoDispose<double>((ref) async {
-  ref.cacheFor(const Duration(seconds: 30));
-  
-  final repository = ref.watch(depositsRepositoryProvider);
-  final date = ref.watch(selectedDateProvider);
-  
-  if (repository == null) return 0;
-  
-  return repository.getDayTotal(formatDateForQuery(date));
+final depositsTotalProvider = Provider<AsyncValue<double>>((ref) {
+  return ref.watch(depositsByDateProvider).whenData(
+        (deposits) => deposits.fold<double>(0.0, (sum, d) => sum + d.amount),
+      );
 });
 
 // ============ RETURNS PROVIDERS ============
@@ -175,15 +230,10 @@ final returnsByDateProvider = StreamProvider<List<ReturnModel>>((ref) {
   return repository.watchReturnsByDate(formatDateForQuery(date));
 });
 
-final returnsTotalProvider = FutureProvider.autoDispose<double>((ref) async {
-  ref.cacheFor(const Duration(seconds: 30));
-  
-  final repository = ref.watch(returnsRepositoryProvider);
-  final date = ref.watch(selectedDateProvider);
-  
-  if (repository == null) return 0;
-  
-  return repository.getDayTotal(formatDateForQuery(date));
+final returnsTotalProvider = Provider<AsyncValue<double>>((ref) {
+  return ref.watch(returnsByDateProvider).whenData(
+        (returns) => returns.fold<double>(0.0, (sum, r) => sum + r.amount),
+      );
 });
 
 // ============ OPENING CASH PROVIDERS ============
@@ -205,44 +255,32 @@ final openingCashProvider = StreamProvider<OpeningCashModel?>((ref) {
 // ============ LIVE CASH PROVIDER ============
 // LiveCash = OpeningCash + CashSales + CreditCollections - ManualDeposits - CashExpenses - Returns
 // Note: Auto-created deposits from non-cash sales are excluded
-final liveCashProvider = FutureProvider.autoDispose<double>((ref) async {
-  // Cache for 30 seconds to avoid redundant queries
-  ref.cacheFor(const Duration(seconds: 30));
-  
-  final date = ref.watch(selectedDateProvider);
-  final dateStr = formatDateForQuery(date);
-  
-  final openingCashRepo = ref.watch(openingCashRepositoryProvider);
-  final salesRepo = ref.watch(salesRepositoryProvider);
-  final expensesRepo = ref.watch(expensesRepositoryProvider);
-  final depositsRepo = ref.watch(depositsRepositoryProvider);
-  final returnsRepo = ref.watch(returnsRepositoryProvider);
-  final creditRepo = ref.watch(creditRepositoryProvider);
-  
-  if (openingCashRepo == null || salesRepo == null || expensesRepo == null ||
-      depositsRepo == null || returnsRepo == null || creditRepo == null) {
-    return 0;
+final liveCashProvider = Provider<AsyncValue<double>>((ref) {
+  final opening = ref.watch(openingCashProvider);
+  final salesTotals = ref.watch(salesTotalsProvider);
+  final expensesTotals = ref.watch(expensesTotalsProvider);
+  final deposits = ref.watch(depositsByDateProvider);
+  final returnsTotal = ref.watch(returnsTotalProvider);
+  final collections = ref.watch(collectionsByDateProvider);
+
+  final sources = <AsyncValue<Object?>>[
+    opening, salesTotals, expensesTotals, deposits, returnsTotal, collections,
+  ];
+  for (final source in sources) {
+    if (source.hasError && !source.hasValue) {
+      return AsyncError(source.error!, source.stackTrace ?? StackTrace.current);
+    }
   }
-  
-  // Fetch all data in parallel for better performance
-  final results = await Future.wait([
-    openingCashRepo.getOpeningCashAmount(dateStr),
-    salesRepo.getDayTotals(dateStr),
-    expensesRepo.getDayTotals(dateStr),
-    depositsRepo.getManualDepositsDayTotal(dateStr),
-    returnsRepo.getDayTotal(dateStr),
-    creditRepo.getCollectionsByDate(dateStr),
-  ]);
-  
-  final openingCash = results[0] as double;
-  final salesTotals = results[1] as Map<String, double>;
-  final expensesTotals = results[2] as Map<String, double>;
-  final manualDepositsTotal = results[3] as double;
-  final returnsTotal = results[4] as double;
-  final creditCollections = results[5] as double;
-  
-  final cashSales = salesTotals['cashSales'] ?? 0;
-  final cashExpenses = expensesTotals['cashExpenses'] ?? 0;
-  
-  return openingCash + cashSales + creditCollections - manualDepositsTotal - cashExpenses - returnsTotal;
+  if (sources.any((s) => !s.hasValue)) return const AsyncLoading();
+
+  final openingCash = opening.value?.amount ?? 0;
+  final cashSales = salesTotals.value!['cashSales'] ?? 0;
+  final cashExpenses = expensesTotals.value!['cashExpenses'] ?? 0;
+  final manualDepositsTotal = deposits.value!
+      .where((d) => !d.isAutoCreated)
+      .fold<double>(0.0, (sum, d) => sum + d.amount);
+  final creditCollections = collections.value!.fold<double>(0.0, (sum, c) => sum + c.amount);
+
+  return AsyncData(openingCash + cashSales + creditCollections - manualDepositsTotal -
+      cashExpenses - returnsTotal.value!);
 });

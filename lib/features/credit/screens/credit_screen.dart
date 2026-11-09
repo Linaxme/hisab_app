@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
+import '../../../widgets/entry_form.dart';
+import '../../../widgets/modern_widgets.dart';
+import '../customer_ledger.dart';
 
 class CreditScreen extends ConsumerStatefulWidget {
   const CreditScreen({super.key});
@@ -18,6 +23,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _showPendingOnly = false;
+  bool _ledgerView = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -51,102 +57,74 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        tr(locale, 'credit_title'),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      // Filter toggle
-                      InkWell(
+                  ScreenHeader(
+                    title: tr(locale, 'credit_title'),
+                    onBack: context.isWide
+                        ? null
+                        : () => context.canPop() ? context.pop() : context.go('/more'),
+                    actions: [
+                      DateChip(
+                        label: _showPendingOnly
+                            ? tr(locale, 'pending_only')
+                            : tr(locale, 'all'),
+                        icon: _showPendingOnly
+                            ? Icons.filter_alt_rounded
+                            : Icons.filter_alt_off_rounded,
+                        color: _showPendingOnly
+                            ? AppTheme.warningColor
+                            : AppTheme.primaryColor,
+                        showChevron: false,
                         onTap: () => setState(
                           () => _showPendingOnly = !_showPendingOnly,
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _showPendingOnly
-                                ? AppTheme.warningColor.withValues(alpha: 0.1)
-                                : AppTheme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _showPendingOnly
-                                    ? Icons.filter_alt
-                                    : Icons.filter_alt_off,
-                                size: 18,
-                                color: _showPendingOnly
-                                    ? AppTheme.warningColor
-                                    : AppTheme.primaryColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _showPendingOnly
-                                    ? tr(locale, 'pending_only')
-                                    : tr(locale, 'all'),
-                                style: TextStyle(
-                                  color: _showPendingOnly
-                                      ? AppTheme.warningColor
-                                      : AppTheme.primaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ).animate().fadeIn().slideX(begin: -0.05),
                   const SizedBox(height: 16),
-                  // Summary Cards
+                  // Summary
                   summaryAsync.when(
-                    data: (summary) => Row(
+                    data: (summary) => Column(
                       children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            label: tr(locale, 'total_credit_label'),
-                            value: CurrencyFormatter.formatNoDecimal(
-                              summary['totalCredit'] ?? 0,
-                            ),
-                            gradient: AppTheme.warningGradient,
-                            amountColor: AppTheme.warningColor,
+                        TotalBanner(
+                          label: tr(locale, 'total_credit_label'),
+                          value: CurrencyFormatter.formatNoDecimal(
+                            summary['totalCredit'] ?? 0,
                           ),
+                          icon: Icons.credit_card_rounded,
+                          gradient: AppTheme.warningGradient,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'আদায়',
-                            value: CurrencyFormatter.formatNoDecimal(
-                              summary['totalCollected'] ?? 0,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _SummaryCard(
+                                label: 'আদায়',
+                                value: CurrencyFormatter.formatNoDecimal(
+                                  summary['totalCollected'] ?? 0,
+                                ),
+                                icon: Icons.check_circle_rounded,
+                                color: AppTheme.successColor,
+                              ),
                             ),
-                            gradient: AppTheme.successGradient,
-                            amountColor: AppTheme.successColor,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'বকেয়া',
-                            value: CurrencyFormatter.formatNoDecimal(
-                              summary['remaining'] ?? 0,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _SummaryCard(
+                                label: 'বকেয়া',
+                                value: CurrencyFormatter.formatNoDecimal(
+                                  summary['remaining'] ?? 0,
+                                ),
+                                icon: Icons.hourglass_bottom_rounded,
+                                color: AppTheme.errorColor,
+                              ),
                             ),
-                            gradient: AppTheme.errorGradient,
-                            amountColor: AppTheme.errorColor,
-                          ),
+                          ],
                         ),
                       ],
                     ).animate().fadeIn(delay: 100.ms),
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
                   // Search Bar
                   TextField(
@@ -165,16 +143,6 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                               },
                             )
                           : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.warningColor.withValues(alpha: 0.05),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
                     ),
                     onChanged: (value) {
                       setState(() {
@@ -182,10 +150,32 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                       });
                     },
                   ).animate().fadeIn(delay: 50.ms),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    segments: [
+                      ButtonSegment(
+                        value: false,
+                        icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                        label: Text(tr(locale, 'tx_view')),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        icon: const Icon(Icons.people_alt_rounded, size: 18),
+                        label: Text(tr(locale, 'ledger_view')),
+                      ),
+                    ],
+                    selected: {_ledgerView},
+                    showSelectedIcon: false,
+                    expandedInsets: EdgeInsets.zero,
+                    onSelectionChanged: (s) => setState(() => _ledgerView = s.first),
+                  ),
                 ],
               ),
             ),
 
+            if (_ledgerView)
+              Expanded(child: CustomerLedgerView(query: _searchQuery))
+            else
             // Credit Sales List
             Expanded(
               child: creditSalesAsync.when(
@@ -213,7 +203,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                         : _EmptyState();
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: filteredCredits.length,
                     itemBuilder: (context, index) {
                       final sale = filteredCredits[index];
@@ -238,37 +228,11 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreditSaleForm(context),
-        backgroundColor: AppTheme.warningColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          'বাকি যোগ করুন',
-          style: TextStyle(color: Colors.white),
-        ),
-      ).animate().slideY(begin: 1, delay: 300.ms).fadeIn(),
-    );
-  }
-
-  void _showCreditSaleForm(
-    BuildContext context, {
-    CreditSaleModel? creditSale,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CreditSaleFormSheet(creditSale: creditSale),
     );
   }
 
   void _showCollectionForm(BuildContext context, CreditSaleModel creditSale) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CollectionFormSheet(creditSale: creditSale),
-    );
+    showEntryForm(context, CollectionFormSheet(creditSale: creditSale));
   }
 
   void _showCreditDetails(BuildContext context, CreditSaleModel creditSale) {
@@ -335,58 +299,43 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
 class _SummaryCard extends StatelessWidget {
   final String label;
   final String value;
-  final LinearGradient gradient;
-  final Color? amountColor;
+  final IconData icon;
+  final Color color;
 
   const _SummaryCard({
     required this.label,
     required this.value,
-    required this.gradient,
-    this.amountColor,
+    required this.icon,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.4), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.cardDecoration(context, radius: 16),
+      child: Row(
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: amountColor ?? AppTheme.accentColor,
+          IconBadge(icon: icon, color: color, size: 36, iconSize: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -399,30 +348,33 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppTheme.warningColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.warningColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.credit_card_rounded,
+                size: 52,
+                color: AppTheme.warningColor,
+              ),
             ),
-            child: const Icon(
-              Icons.credit_card_rounded,
-              size: 64,
-              color: AppTheme.warningColor,
+            const SizedBox(height: 24),
+            Text('কোনো বাকি নেই', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'বাকি বিক্রয় ট্র্যাক করতে + বাটনে ক্লিক করুন',
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text('কোনো বাকি নেই', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'বাকি বিক্রয় ট্র্যাক করতে + বাটনে ক্লিক করুন',
-            style: TextStyle(color: AppTheme.textSecondary),
-          ),
-        ],
-      ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.9, 0.9)),
+          ],
+        ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.9, 0.9)),
+      ),
     );
   }
 }
@@ -436,40 +388,43 @@ class _EmptySearchState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: AppTheme.warningColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: AppTheme.warningColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.search_off_rounded,
+                size: 56,
+                color: AppTheme.warningColor.withValues(alpha: 0.3),
+              ),
             ),
-            child: Icon(
-              Icons.search_off_rounded,
-              size: 56,
-              color: AppTheme.warningColor.withValues(alpha: 0.3),
+            const SizedBox(height: 24),
+            Text(
+              'কোনো ফলাফল পাওয়া যায়নি',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'কোনো ফলাফল পাওয়া যায়নি',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
+            const SizedBox(height: 8),
+            Text(
+              '"$query" এর জন্য কোনো বাকি নেই',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary.withValues(alpha: 0.7),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '"$query" এর জন্য কোনো বাকি নেই',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -490,69 +445,36 @@ class _CreditSaleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = AppTheme.isDark(context);
     final progress = creditSale.amount > 0
         ? creditSale.collectedAmount / creditSale.amount
         : 0.0;
+    final statusColor =
+        creditSale.isFullyPaid ? AppTheme.successColor : AppTheme.warningColor;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.blue.withValues(alpha: 0.3)
-              : Colors.blue.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.blue.withValues(alpha: 0.2)
-                : Colors.blue.withValues(alpha: 0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.cardDecoration(context, radius: 18),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: Column(
               children: [
                 Row(
                   children: [
-                    // Customer icon
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: creditSale.isFullyPaid
-                            ? AppTheme.successColor.withValues(alpha: 0.1)
-                            : AppTheme.warningColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        creditSale.isFullyPaid
-                            ? Icons.check_circle_rounded
-                            : Icons.person_rounded,
-                        color: creditSale.isFullyPaid
-                            ? AppTheme.successColor
-                            : AppTheme.warningColor,
-                        size: 18,
-                      ),
+                    IconBadge(
+                      icon: creditSale.isFullyPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.person_rounded,
+                      color: statusColor,
+                      size: 42,
+                      iconSize: 20,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     // Details
                     Expanded(
                       child: Column(
@@ -561,8 +483,8 @@ class _CreditSaleCard extends StatelessWidget {
                           Text(
                             creditSale.customerName ?? 'অজানা গ্রাহক',
                             style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -587,52 +509,56 @@ class _CreditSaleCard extends StatelessWidget {
                         Text(
                           CurrencyFormatter.formatNoDecimal(creditSale.amount),
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
                             color: AppTheme.warningColor,
                           ),
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          'বকেয়া: ${CurrencyFormatter.formatNoDecimal(creditSale.remainingAmount)}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: creditSale.isFullyPaid
-                                ? AppTheme.successColor
-                                : AppTheme.errorColor,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        const SizedBox(height: 4),
+                        StatusPill(
+                          label: creditSale.isFullyPaid
+                              ? 'পরিশোধিত'
+                              : 'বকেয়া ${CurrencyFormatter.formatNoDecimal(creditSale.remainingAmount)}',
+                          color: creditSale.isFullyPaid
+                              ? AppTheme.successColor
+                              : AppTheme.errorColor,
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
                 // Progress bar
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: AlwaysStoppedAnimation(
-                      creditSale.isFullyPaid
-                          ? AppTheme.successColor
-                          : AppTheme.warningColor,
+                    value: progress.clamp(0.0, 1.0),
+                    backgroundColor: statusColor.withValues(
+                      alpha: isDark ? 0.18 : 0.12,
                     ),
-                    minHeight: 4,
+                    valueColor: AlwaysStoppedAnimation(statusColor),
+                    minHeight: 6,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 // Actions
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      creditSale.date,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: AppTheme.textSecondary,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.event_rounded,
+                          size: 13,
+                          color: AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${creditSale.date} · ${(progress * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -640,10 +566,13 @@ class _CreditSaleCard extends StatelessWidget {
                         if (!creditSale.isFullyPaid)
                           TextButton.icon(
                             onPressed: onAddCollection,
-                            icon: const Icon(Icons.add_rounded, size: 14),
+                            icon: const Icon(Icons.add_rounded, size: 16),
                             label: const Text(
                               'আদায়',
-                              style: TextStyle(fontSize: 11),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             style: TextButton.styleFrom(
                               foregroundColor: AppTheme.successColor,
@@ -658,10 +587,10 @@ class _CreditSaleCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         IconButton(
                           onPressed: onDelete,
-                          icon: const Icon(Icons.delete_rounded, size: 16),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18),
                           color: AppTheme.errorColor,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'মুছুন',
                         ),
                       ],
                     ),
@@ -676,17 +605,17 @@ class _CreditSaleCard extends StatelessWidget {
   }
 }
 
-class _CreditSaleFormSheet extends ConsumerStatefulWidget {
+class CreditSaleFormSheet extends ConsumerStatefulWidget {
   final CreditSaleModel? creditSale;
 
-  const _CreditSaleFormSheet({this.creditSale});
+  const CreditSaleFormSheet({super.key, this.creditSale});
 
   @override
-  ConsumerState<_CreditSaleFormSheet> createState() =>
+  ConsumerState<CreditSaleFormSheet> createState() =>
       _CreditSaleFormSheetState();
 }
 
-class _CreditSaleFormSheetState extends ConsumerState<_CreditSaleFormSheet> {
+class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _customerNameController = TextEditingController();
   final _customerPhoneController = TextEditingController();
@@ -803,17 +732,7 @@ class _CreditSaleFormSheetState extends ConsumerState<_CreditSaleFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SheetHandle(),
               const SizedBox(height: 12),
 
               // Title
@@ -925,17 +844,17 @@ class _CreditSaleFormSheetState extends ConsumerState<_CreditSaleFormSheet> {
   }
 }
 
-class _CollectionFormSheet extends ConsumerStatefulWidget {
+class CollectionFormSheet extends ConsumerStatefulWidget {
   final CreditSaleModel creditSale;
 
-  const _CollectionFormSheet({required this.creditSale});
+  const CollectionFormSheet({super.key, required this.creditSale});
 
   @override
-  ConsumerState<_CollectionFormSheet> createState() =>
+  ConsumerState<CollectionFormSheet> createState() =>
       _CollectionFormSheetState();
 }
 
-class _CollectionFormSheetState extends ConsumerState<_CollectionFormSheet> {
+class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   bool _isLoading = false;
@@ -1023,17 +942,7 @@ class _CollectionFormSheetState extends ConsumerState<_CollectionFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SheetHandle(),
               const SizedBox(height: 20),
 
               // Title
@@ -1156,17 +1065,7 @@ class _CreditDetailsSheet extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+                const SheetHandle(),
                 const SizedBox(height: 20),
 
                 // Customer info

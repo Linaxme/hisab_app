@@ -132,10 +132,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const JoinShopScreen(),
       ),
       
-      // Main App Routes with Shell (Bottom Navigation)
+      // Main app routes share the shell (bottom bar on phones, sidebar on wide screens)
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
+          GoRoute(
+            path: '/profile',
+            pageBuilder: (context, state) => const NoTransitionPage(child: ProfileScreen()),
+          ),
+          GoRoute(
+            path: '/deposits',
+            pageBuilder: (context, state) => const NoTransitionPage(child: DepositsScreen()),
+          ),
+          GoRoute(
+            path: '/returns',
+            pageBuilder: (context, state) => const NoTransitionPage(child: ReturnsScreen()),
+          ),
+          GoRoute(
+            path: '/monthly-summary',
+            pageBuilder: (context, state) => const NoTransitionPage(child: MonthlySummaryScreen()),
+          ),
+          GoRoute(
+            path: '/products-settings',
+            pageBuilder: (context, state) => const NoTransitionPage(child: ProductsSettingsScreen()),
+          ),
+          GoRoute(
+            path: '/settings',
+            pageBuilder: (context, state) => const NoTransitionPage(child: SettingsScreen()),
+          ),
           GoRoute(
             path: '/dashboard',
             pageBuilder: (context, state) => const NoTransitionPage(child: DashboardScreen()),
@@ -157,32 +181,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => const NoTransitionPage(child: MoreScreen()),
           ),
         ],
-      ),
-      
-      // Non-shell routes
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/deposits',
-        builder: (context, state) => const DepositsScreen(),
-      ),
-      GoRoute(
-        path: '/returns',
-        builder: (context, state) => const ReturnsScreen(),
-      ),
-      GoRoute(
-        path: '/monthly-summary',
-        builder: (context, state) => const MonthlySummaryScreen(),
-      ),
-      GoRoute(
-        path: '/products-settings',
-        builder: (context, state) => const ProductsSettingsScreen(),
-      ),
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

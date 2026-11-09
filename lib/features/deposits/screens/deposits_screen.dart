@@ -7,6 +7,9 @@ import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/models.dart';
+import '../../../core/utils/responsive.dart';
+import '../../../widgets/entry_form.dart';
+import '../../../widgets/modern_widgets.dart';
 
 class DepositsScreen extends ConsumerStatefulWidget {
   const DepositsScreen({super.key});
@@ -68,104 +71,28 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => _handleBack(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        t('deposits_title'),
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const Spacer(),
-                      // Date Picker
-                      InkWell(
+                  ScreenHeader(
+                    title: t('deposits_title'),
+                    onBack: context.isWide ? null : () => _handleBack(context),
+                    actions: [
+                      DateChip(
+                        label: dateStr,
                         onTap: _pickDate,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 18,
-                                color: AppTheme.accentColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                dateStr,
-                                style: const TextStyle(
-                                  color: AppTheme.accentColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        color: AppTheme.accentColor,
                       ),
                     ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
+                  ).animate().fadeIn().slideX(begin: -0.05),
                   const SizedBox(height: 16),
-                  // Total Card
+                  // Total banner
                   totalAsync.when(
-                    data: (total) {
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppTheme.darkCard : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.blue.withValues(alpha: 0.4),
-                            width: 2,
-                          ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                            spreadRadius: 1,
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            t('total_deposits'),
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            CurrencyFormatter.formatNoDecimal(total),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.accentColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                    },
+                    data: (total) => TotalBanner(
+                      label: t('total_deposits'),
+                      value: CurrencyFormatter.formatNoDecimal(total),
+                      icon: Icons.savings_rounded,
+                      gradient: AppTheme.accentGradient,
+                    ),
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                   ).animate().fadeIn(delay: 100.ms),
                 ],
               ),
@@ -179,7 +106,7 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
                     return _EmptyState(locale: locale);
                   }
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: deposits.length,
                     itemBuilder: (context, index) {
                       final deposit = deposits[index];
@@ -199,22 +126,11 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showDepositForm(context),
-        backgroundColor: AppTheme.accentColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(t('add_deposit'), style: const TextStyle(color: Colors.white)),
-      ).animate().slideY(begin: 1, delay: 300.ms).fadeIn(),
     );
   }
 
   void _showDepositForm(BuildContext context, {DepositModel? deposit}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _DepositFormSheet(deposit: deposit),
-    );
+    showEntryForm(context, DepositFormSheet(deposit: deposit));
   }
 
   Future<void> _deleteDeposit(DepositModel deposit) async {
@@ -325,129 +241,38 @@ class _DepositCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final t = (String key, {Map<String, String> params = const {}}) => tr(locale, key, params: params);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+
+    return EntryCard(
+      icon: deposit.isAutoCreated ? Icons.phone_android_rounded : Icons.savings_rounded,
+      color: AppTheme.accentColor,
+      title: deposit.note ?? t('deposit_default_note'),
+      subtitle: Row(
+        children: [
+          Text(deposit.date, style: Theme.of(context).textTheme.bodySmall),
+          if (deposit.isAutoCreated) ...[
+            const SizedBox(width: 6),
+            const StatusPill(label: 'Auto', color: AppTheme.infoColor),
+          ],
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Icon
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.savings_rounded,
-                    color: AppTheme.accentColor,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        deposit.note ?? t('deposit_default_note'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        deposit.date,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Amount
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      CurrencyFormatter.formatNoDecimal(deposit.amount),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: AppTheme.accentColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: onEdit,
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.edit_rounded,
-                              size: 18,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: onDelete,
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.delete_rounded,
-                              size: 18,
-                              color: AppTheme.errorColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      amount: CurrencyFormatter.formatNoDecimal(deposit.amount),
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }
 
-class _DepositFormSheet extends ConsumerStatefulWidget {
+class DepositFormSheet extends ConsumerStatefulWidget {
   final DepositModel? deposit;
 
-  const _DepositFormSheet({this.deposit});
+  const DepositFormSheet({super.key, this.deposit});
 
   @override
-  ConsumerState<_DepositFormSheet> createState() => _DepositFormSheetState();
+  ConsumerState<DepositFormSheet> createState() => _DepositFormSheetState();
 }
 
-class _DepositFormSheetState extends ConsumerState<_DepositFormSheet> {
+class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
@@ -548,17 +373,7 @@ class _DepositFormSheetState extends ConsumerState<_DepositFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const SheetHandle(),
               const SizedBox(height: 20),
               
               // Title

@@ -4,7 +4,8 @@ import 'package:intl/intl.dart';
 class DateFormatter {
   DateFormatter._();
 
-  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
+  // Stored dates always use ASCII digits, whatever Intl.defaultLocale is.
+  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd', 'en_US');
   static final DateFormat _displayFormat = DateFormat('dd MMM yyyy');
   static final DateFormat _monthYearFormat = DateFormat('MMMM yyyy');
   static final DateFormat _timeFormat = DateFormat('hh:mm a');

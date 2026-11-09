@@ -91,6 +91,44 @@ class SalesRepository {
     return sales;
   }
 
+  // Aggregate queries bill one read per 1000 matched sales instead of one per sale.
+  // They need the network, so callers fall back to the document reads on error.
+
+  // Sales total of one day
+  Future<double> getDaySalesSum(String date) async {
+    final snapshot = await _salesCollection
+        .where('date', isEqualTo: date)
+        .aggregate(sum('sellPrice'))
+        .get();
+    return snapshot.getSum('sellPrice') ?? 0;
+  }
+
+  // Totals for a date range. One field per aggregate: a sum only sees documents that
+  // have every field of its index, and each sum needs a composite index (firestore.indexes.json).
+  Future<Map<String, double>> getRangeTotals(String startDate, String endDate) async {
+    final range = _salesCollection
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endDate);
+    final results = await Future.wait([
+      range.count().get(),
+      range.aggregate(sum('sellPrice')).get(),
+      range.aggregate(sum('profit')).get(),
+      range
+          .where('paymentType', isEqualTo: 'noncash')
+          .aggregate(sum('sellPrice'))
+          .get(),
+    ]);
+    final totalSales = results[1].getSum('sellPrice') ?? 0;
+    final nonCashSales = results[3].getSum('sellPrice') ?? 0;
+    return {
+      'totalSales': totalSales,
+      'totalProfit': results[2].getSum('profit') ?? 0,
+      'cashSales': totalSales - nonCashSales,
+      'nonCashSales': nonCashSales,
+      'salesCount': (results[0].count ?? 0).toDouble(),
+    };
+  }
+
   // Update. [autoDeposit] is the deposit the sale should have now (null for a cash sale).
   Future<void> updateSale(
     SaleModel oldSale,

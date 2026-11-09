@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/localization/strings.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
@@ -79,8 +80,9 @@ class CategoryManagementScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCategoryForm(context, ref),
         backgroundColor: AppTheme.primaryColor,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('ক্যাটাগরি যোগ', style: TextStyle(color: Colors.white)),
+        foregroundColor: AppTheme.onPrimary,
+        icon: const Icon(Icons.add),
+        label: const Text('ক্যাটাগরি যোগ'),
       ),
     );
   }
@@ -105,6 +107,8 @@ class _CategoryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subcategoriesAsync = ref.watch(expenseSubcategoriesProvider(category.id));
+    final locale = ref.watch(languageProvider);
+    final accent = category.isSavings ? AppTheme.successColor : AppTheme.primaryColor;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -114,15 +118,21 @@ class _CategoryCard extends ConsumerWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+            color: accent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.category, color: AppTheme.primaryColor),
+          child: Icon(category.isSavings ? Icons.savings_rounded : Icons.category, color: accent),
         ),
         title: Text(
           category.name,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
+        subtitle: category.isSavings
+            ? Text(
+                tr(locale, 'savings_category'),
+                style: const TextStyle(color: AppTheme.successColor, fontSize: 12),
+              )
+            : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -138,6 +148,14 @@ class _CategoryCard extends ConsumerWidget {
           ],
         ),
         children: [
+          SwitchListTile(
+            value: category.isSavings,
+            onChanged: (v) => ref.read(expensesRepositoryProvider)?.setCategorySavings(category.id, v),
+            activeThumbColor: AppTheme.successColor,
+            secondary: const Icon(Icons.savings_rounded, color: AppTheme.successColor),
+            title: Text(tr(locale, 'savings_category')),
+            subtitle: Text(tr(locale, 'savings_category_sub'), style: Theme.of(context).textTheme.bodySmall),
+          ),
           subcategoriesAsync.when(
             data: (subcategories) {
               return Column(
@@ -405,11 +423,11 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.onPrimary),
                     )
                   : Text(
                       _isEditing ? 'আপডেট করুন' : 'যোগ করুন',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: AppTheme.onPrimary, fontSize: 16),
                     ),
             ),
             const SizedBox(height: 20),
@@ -554,11 +572,11 @@ class _SubcategoryFormSheetState extends ConsumerState<_SubcategoryFormSheet> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.onPrimary),
                     )
                   : Text(
                       _isEditing ? 'আপডেট করুন' : 'যোগ করুন',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: AppTheme.onPrimary, fontSize: 16),
                     ),
             ),
             const SizedBox(height: 20),

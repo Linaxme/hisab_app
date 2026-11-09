@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
+import '../widgets/auth_scaffold.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -88,374 +89,185 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final locale = ref.watch(languageProvider);
 
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? null
-              : LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppTheme.primaryColor.withValues(alpha: 0.05),
-                    Colors.white,
-                  ],
+    return AuthScaffold(
+      icon: Icons.person_add_alt_1_rounded,
+      title: 'অ্যাকাউন্ট তৈরি করুন',
+      subtitle: 'আপনার তথ্য দিয়ে শুরু করুন',
+      onBack: () => context.go('/login'),
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_errorMessage != null) ...[
+                AuthErrorBanner(message: _errorMessage!),
+                const SizedBox(height: 16),
+              ],
+
+              // Role Selection
+              Text(
+                'আমি একজন:',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _RoleCard(
+                      title: 'দোকান মালিক',
+                      subtitle: 'সম্পূর্ণ অ্যাক্সেস',
+                      icon: Icons.admin_panel_settings_rounded,
+                      isSelected: _selectedRole == AppConstants.roleOwner,
+                      onTap: () => setState(
+                        () => _selectedRole = AppConstants.roleOwner,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _RoleCard(
+                      title: 'স্টাফ',
+                      subtitle: 'সীমিত অ্যাক্সেস',
+                      icon: Icons.badge_rounded,
+                      isSelected: _selectedRole == AppConstants.roleStaff,
+                      onTap: () => setState(
+                        () => _selectedRole = AppConstants.roleStaff,
+                      ),
+                    ),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 120.ms),
+              const SizedBox(height: 20),
+
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'name'),
+                  prefixIcon: const Icon(Icons.person_rounded),
                 ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Back Button
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          onPressed: () => context.go('/login'),
-                          icon: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isDark ? AppTheme.darkCard : Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(Icons.arrow_back_rounded),
-                          ),
-                        ),
-                      ).animate().fadeIn().slideX(begin: -0.2),
-                      const SizedBox(height: 16),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'নাম দিন';
+                  }
+                  return null;
+                },
+              ).animate().fadeIn(delay: 180.ms).slideY(begin: 0.1),
+              const SizedBox(height: 14),
 
-                      // Title
-                      Text(
-                        'অ্যাকাউন্ট তৈরি করুন',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
-                      const SizedBox(height: 8),
-                      Text(
-                        'আপনার তথ্য দিয়ে শুরু করুন',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                      ).animate().fadeIn(delay: 150.ms),
-                      const SizedBox(height: 32),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'email'),
+                  prefixIcon: const Icon(Icons.alternate_email_rounded),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'ইমেইল দিন';
+                  }
+                  if (!value.contains('@')) {
+                    return 'সঠিক ইমেইল দিন';
+                  }
+                  return null;
+                },
+              ).animate().fadeIn(delay: 230.ms).slideY(begin: 0.1),
+              const SizedBox(height: 14),
 
-                      // Error Message
-                      if (_errorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppTheme.errorColor.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: AppTheme.errorColor,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(
-                                    color: AppTheme.errorColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().shake(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Role Selection
-                      Text(
-                        'আমি একজন:',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ).animate().fadeIn(delay: 200.ms),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _RoleCard(
-                              title: 'দোকান মালিক',
-                              subtitle: 'সম্পূর্ণ অ্যাক্সেস',
-                              icon: Icons.admin_panel_settings_rounded,
-                              isSelected:
-                                  _selectedRole == AppConstants.roleOwner,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRole = AppConstants.roleOwner;
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _RoleCard(
-                              title: 'স্টাফ',
-                              subtitle: 'সীমিত অ্যাক্সেস',
-                              icon: Icons.person_rounded,
-                              isSelected:
-                                  _selectedRole == AppConstants.roleStaff,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRole = AppConstants.roleStaff;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ).animate().fadeIn(delay: 250.ms).slideX(begin: 0.1),
-                      const SizedBox(height: 24),
-
-                      // Name Field
-                      _buildTextField(
-                        controller: _nameController,
-                        label: tr(locale, 'name'),
-                        icon: Icons.person_rounded,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'নাম দিন';
-                          }
-                          return null;
-                        },
-                      ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.1),
-                      const SizedBox(height: 16),
-
-                      // Email Field
-                      _buildTextField(
-                        controller: _emailController,
-                        label: tr(locale, 'email'),
-                        icon: Icons.email_rounded,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'ইমেইল দিন';
-                          }
-                          if (!value.contains('@')) {
-                            return 'সঠিক ইমেইল দিন';
-                          }
-                          return null;
-                        },
-                      ).animate().fadeIn(delay: 350.ms).slideX(begin: 0.1),
-                      const SizedBox(height: 16),
-
-                      // Password Field
-                      _buildTextField(
-                        controller: _passwordController,
-                        label: tr(locale, 'password'),
-                        icon: Icons.lock_rounded,
-                        obscureText: _obscurePassword,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: AppTheme.textSecondary,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'পাসওয়ার্ড দিন';
-                          }
-                          if (value.length < 6) {
-                            return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে';
-                          }
-                          return null;
-                        },
-                      ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
-                      const SizedBox(height: 16),
-
-                      // Confirm Password Field
-                      _buildTextField(
-                        controller: _confirmPasswordController,
-                        label: tr(locale, 'confirm_password'),
-                        icon: Icons.lock_rounded,
-                        obscureText: _obscureConfirmPassword,
-                        onSubmitted: (_) => _register(),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: AppTheme.textSecondary,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword =
-                                  !_obscureConfirmPassword;
-                            });
-                          },
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'পাসওয়ার্ড নিশ্চিত করুন';
-                          }
-                          if (value != _passwordController.text) {
-                            return 'পাসওয়ার্ড মিলছে না';
-                          }
-                          return null;
-                        },
-                      ).animate().fadeIn(delay: 450.ms).slideX(begin: 0.1),
-                      const SizedBox(height: 32),
-
-                      // Register Button
-                      Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: _isLoading
-                              ? null
-                              : AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: _isLoading
-                              ? null
-                              : [
-                                  BoxShadow(
-                                    color: AppTheme.primaryColor.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  tr(locale, 'register'),
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                        ),
-                      ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2),
-                      const SizedBox(height: 24),
-
-                      // Login Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'অ্যাকাউন্ট আছে? ',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          TextButton(
-                            onPressed: () => context.go('/login'),
-                            child: const Text(
-                              'লগইন করুন',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ).animate().fadeIn(delay: 550.ms),
-                    ],
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'password'),
+                  prefixIcon: const Icon(Icons.lock_rounded),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
-              ),
-            ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'পাসওয়ার্ড দিন';
+                  }
+                  if (value.length < 6) {
+                    return 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে';
+                  }
+                  return null;
+                },
+              ).animate().fadeIn(delay: 280.ms).slideY(begin: 0.1),
+              const SizedBox(height: 14),
+
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _register(),
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'confirm_password'),
+                  prefixIcon: const Icon(Icons.lock_reset_rounded),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                    ),
+                    onPressed: () => setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'পাসওয়ার্ড নিশ্চিত করুন';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'পাসওয়ার্ড মিলছে না';
+                  }
+                  return null;
+                },
+              ).animate().fadeIn(delay: 330.ms).slideY(begin: 0.1),
+              const SizedBox(height: 24),
+
+              GradientButton(
+                label: tr(locale, 'register'),
+                icon: Icons.arrow_forward_rounded,
+                isLoading: _isLoading,
+                onPressed: _register,
+              ).animate().fadeIn(delay: 380.ms).slideY(begin: 0.2),
+              const SizedBox(height: 16),
+
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'অ্যাকাউন্ট আছে? ',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text(
+                      'লগইন করুন',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 430.ms),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    TextCapitalization textCapitalization = TextCapitalization.none,
-    bool obscureText = false,
-    Widget? suffixIcon,
-    String? Function(String?)? validator,
-    void Function(String)? onSubmitted,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textCapitalization: textCapitalization,
-      obscureText: obscureText,
-      textInputAction: onSubmitted != null
-          ? TextInputAction.done
-          : TextInputAction.next,
-      onFieldSubmitted: onSubmitted,
-      style: const TextStyle(fontSize: 16),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: AppTheme.primaryColor),
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: isDark ? AppTheme.darkCard : Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppTheme.errorColor),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
-        ),
-      ),
-      validator: validator,
+      ],
     );
   }
 }
@@ -477,60 +289,59 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = AppTheme.isDark(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: isSelected ? AppTheme.primaryGradient : null,
-          color: isSelected
-              ? null
-              : (isDark ? AppTheme.darkCard : Colors.white),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          decoration: BoxDecoration(
+            gradient: isSelected ? AppTheme.primaryGradient : null,
             color: isSelected
-                ? Colors.transparent
-                : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
-            width: 1,
+                ? null
+                : (isDark ? AppTheme.darkSurface : AppTheme.lightBackground),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected
+                  ? Colors.transparent
+                  : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+            ),
+            boxShadow: isSelected
+                ? AppTheme.softShadow(AppTheme.primaryColor)
+                : null,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 36,
-              color: isSelected ? Colors.white : AppTheme.textSecondary,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white : Colors.black87),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 32,
+                color: isSelected ? AppTheme.onPrimary : AppTheme.primaryColor,
               ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? Colors.white70 : AppTheme.textSecondary,
+              const SizedBox(height: 8),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? AppTheme.onPrimary : null,
+                ),
               ),
-            ),
-          ],
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSelected
+                      ? AppTheme.onPrimary.withValues(alpha: 0.7)
+                      : AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

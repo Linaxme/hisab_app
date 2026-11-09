@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
+import '../widgets/auth_scaffold.dart';
 
 class JoinShopScreen extends ConsumerStatefulWidget {
   const JoinShopScreen({super.key});
@@ -69,171 +70,82 @@ class _JoinShopScreenState extends ConsumerState<JoinShopScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(languageProvider);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Icon
-                    Icon(
-                      Icons.group_add,
-                      size: 80,
-                      color: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(height: 24),
 
-                    // Title
-                    Text(
-                      tr(locale, 'join_shop'),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Enter the invite code provided by your shop owner',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Error Message
-                    if (_errorMessage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: AppTheme.errorColor,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(color: AppTheme.errorColor),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Invite Code Field
-                    TextFormField(
-                      controller: _inviteCodeController,
-                      textCapitalization: TextCapitalization.characters,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _joinShop(),
-                      decoration: InputDecoration(
-                        labelText: tr(locale, 'invite_code'),
-                        prefixIcon: const Icon(Icons.key),
-                        hintText: tr(locale, 'invite_code_hint'),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter the invite code';
-                        }
-                        if (value.length != 6) {
-                          return 'Invite code must be 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Join Button
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _joinShop,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                tr(locale, 'join_shop_button'),
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Info Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.amber.shade700,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Don\'t have a code?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber.shade700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Ask your shop owner for the invite code. They can find it in Settings > Staff Management.',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Logout Button
-                    TextButton.icon(
-                      onPressed: () async {
-                        await ref.read(authRepositoryProvider).signOut();
-                      },
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
-                    ),
-                  ],
+    return AuthScaffold(
+      icon: Icons.group_add_rounded,
+      title: tr(locale, 'join_shop'),
+      subtitle: 'Enter the invite code provided by your shop owner',
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_errorMessage != null) ...[
+                AuthErrorBanner(message: _errorMessage!),
+                const SizedBox(height: 16),
+              ],
+              TextFormField(
+                controller: _inviteCodeController,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                textAlign: TextAlign.center,
+                maxLength: 6,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 8,
+                ),
+                onFieldSubmitted: (_) => _joinShop(),
+                decoration: InputDecoration(
+                  labelText: tr(locale, 'invite_code'),
+                  prefixIcon: const Icon(Icons.key_rounded),
+                  hintText: tr(locale, 'invite_code_hint'),
+                  hintStyle: const TextStyle(
+                    fontSize: 14,
+                    letterSpacing: 0,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  counterText: '',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter the invite code';
+                  }
+                  if (value.length != 6) {
+                    return 'Invite code must be 6 characters';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              GradientButton(
+                label: tr(locale, 'join_shop_button'),
+                icon: Icons.arrow_forward_rounded,
+                isLoading: _isLoading,
+                onPressed: _joinShop,
+              ),
+              const SizedBox(height: 20),
+              const AuthInfoTile(
+                icon: Icons.help_rounded,
+                color: AppTheme.warningColor,
+                title: 'Don\'t have a code?',
+                message:
+                    'Ask your shop owner for the invite code. They can find it in Settings > Staff Management.',
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                icon: const Icon(Icons.logout_rounded),
+                label: Text(tr(locale, 'logout')),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textSecondary,
                 ),
               ),
-            ),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
