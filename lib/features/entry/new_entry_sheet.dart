@@ -5,7 +5,6 @@ import '../../core/localization/strings.dart';
 import '../../core/providers/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
-import '../../core/utils/responsive.dart';
 import '../../data/models/models.dart';
 import '../../widgets/app_panel.dart';
 import '../../widgets/entry_form.dart';
@@ -17,29 +16,32 @@ import '../sales/screens/sales_screen.dart';
 
 class _EntryAction {
   final String labelKey;
-  final String subKey;
   final IconData icon;
   final Color color;
 
   /// Null means "collect credit", which first asks which customer.
   final Widget? form;
 
-  const _EntryAction(this.labelKey, this.subKey, this.icon, this.color, this.form);
+  const _EntryAction(this.labelKey, this.icon, this.color, this.form);
 }
 
 const _actions = [
-  _EntryAction('add_sale', 'entry_sale_sub', Icons.point_of_sale_rounded, AppTheme.successColor, SaleFormSheet()),
-  _EntryAction('add_expense', 'entry_expense_sub', Icons.receipt_long_rounded, AppTheme.errorColor, ExpenseFormSheet()),
-  _EntryAction('add_credit', 'entry_credit_sub', Icons.handshake_rounded, AppTheme.warningColor, CreditSaleFormSheet()),
-  _EntryAction('entry_collect', 'entry_collect_sub', Icons.call_received_rounded, AppTheme.primaryColor, null),
-  _EntryAction('add_deposit', 'entry_deposit_sub', Icons.savings_rounded, AppTheme.accentColor, DepositFormSheet()),
-  _EntryAction('add_return', 'entry_return_sub', Icons.assignment_return_rounded, AppTheme.violetColor, ReturnFormSheet()),
+  _EntryAction('add_sale', Icons.point_of_sale_rounded, AppTheme.successColor, SaleFormSheet()),
+  _EntryAction('add_expense', Icons.receipt_long_rounded, AppTheme.errorColor, ExpenseFormSheet()),
+  _EntryAction('add_credit', Icons.handshake_rounded, AppTheme.warningColor, CreditSaleFormSheet()),
+  _EntryAction('entry_collect', Icons.call_received_rounded, AppTheme.primaryColor, null),
+  _EntryAction('add_deposit', Icons.savings_rounded, AppTheme.accentColor, DepositFormSheet()),
+  _EntryAction('add_return', Icons.assignment_return_rounded, AppTheme.violetColor, ReturnFormSheet()),
 ];
 
 /// The single "add anything" menu behind the centre + button and the
 /// sidebar's New Entry button.
 Future<void> showNewEntrySheet(BuildContext hostContext) {
-  return showAppPanel(hostContext, _NewEntryPanel(hostContext: hostContext));
+  return showAppPanel(
+    hostContext,
+    _NewEntryPanel(hostContext: hostContext),
+    maxWidth: 440,
+  );
 }
 
 class _NewEntryPanel extends ConsumerWidget {
@@ -51,7 +53,11 @@ class _NewEntryPanel extends ConsumerWidget {
     Navigator.of(context).pop();
     final form = action.form;
     if (form == null) {
-      showAppPanel(hostContext, _CollectPicker(hostContext: hostContext));
+      showAppPanel(
+        hostContext,
+        _CollectPicker(hostContext: hostContext),
+        maxWidth: 440,
+      );
     } else {
       showEntryForm(hostContext, form);
     }
@@ -60,45 +66,43 @@ class _NewEntryPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(languageProvider);
-    final columns = context.isWide ? 3 : 2;
 
     return AppPanelFrame(
       title: tr(locale, 'new_entry'),
       subtitle: tr(locale, 'new_entry_sub'),
-      child: GridView.count(
-        crossAxisCount: columns,
+      child: GridView(
         shrinkWrap: true,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: columns == 3 ? 1.25 : 1.35,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          mainAxisExtent: 56,
+        ),
         children: [
           for (final (i, action) in _actions.indexed)
-            _ActionTile(
+            _ActionButton(
               label: tr(locale, action.labelKey),
-              subtitle: tr(locale, action.subKey),
               icon: action.icon,
               color: action.color,
               onTap: () => _open(context, action),
             )
                 .animate()
-                .fadeIn(delay: (40 * i).ms, duration: 220.ms)
-                .scale(begin: const Offset(0.92, 0.92), curve: Curves.easeOutBack),
+                .fadeIn(delay: (30 * i).ms, duration: 200.ms)
+                .scale(begin: const Offset(0.95, 0.95), curve: Curves.easeOut),
         ],
       ),
     );
   }
 }
 
-class _ActionTile extends StatelessWidget {
+class _ActionButton extends StatelessWidget {
   final String label;
-  final String subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
 
-  const _ActionTile({
+  const _ActionButton({
     required this.label,
-    required this.subtitle,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -106,51 +110,22 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [color.withValues(alpha: 0.16), AppTheme.darkCard],
-            ),
-            border: Border.all(color: color.withValues(alpha: 0.28)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: AppTheme.softShadow(color),
-                ),
-                child: Icon(icon, color: AppTheme.onColor(color), size: 22),
-              ),
-              const Spacer(),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-              ),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 22),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        backgroundColor: color.withValues(alpha: 0.12),
+        side: BorderSide(color: color.withValues(alpha: 0.45)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       ),
     );
   }

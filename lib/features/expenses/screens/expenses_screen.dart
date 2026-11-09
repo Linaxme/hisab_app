@@ -674,7 +674,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: _PaymentTypeButton(
+                    child: PaymentTypeButton(
                       label: 'ক্যাশ থেকে',
                       icon: Icons.point_of_sale_rounded,
                       isSelected: _paymentType == PaymentType.cash,
@@ -685,7 +685,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _PaymentTypeButton(
+                    child: PaymentTypeButton(
                       label: 'ক্যাশের বাইরে',
                       icon: Icons.account_balance_wallet_outlined,
                       isSelected: _paymentType == PaymentType.noncash,
@@ -739,67 +739,6 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
               const SizedBox(height: 16),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PaymentTypeButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _PaymentTypeButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: isSelected ? AppTheme.errorGradient : null,
-          color: isSelected
-              ? null
-              : (isDark ? AppTheme.darkCard : Colors.grey.shade100),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.shade300,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : AppTheme.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : AppTheme.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

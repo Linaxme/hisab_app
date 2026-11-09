@@ -4,6 +4,7 @@ import '../../../core/localization/strings.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
+import '../../../widgets/entry_form.dart';
 
 class CategoryManagementScreen extends ConsumerWidget {
   const CategoryManagementScreen({super.key});
@@ -88,13 +89,7 @@ class CategoryManagementScreen extends ConsumerWidget {
   }
 
   void _showCategoryForm(BuildContext context, WidgetRef ref, [ExpenseCategoryModel? category]) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _CategoryFormSheet(category: category),
+    showEntryForm(context, _CategoryFormSheet(category: category),
     );
   }
 }
@@ -200,24 +195,12 @@ class _CategoryCard extends ConsumerWidget {
   }
 
   void _showCategoryForm(BuildContext context, WidgetRef ref, ExpenseCategoryModel category) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _CategoryFormSheet(category: category),
+    showEntryForm(context, _CategoryFormSheet(category: category),
     );
   }
 
   void _showSubcategoryForm(BuildContext context, WidgetRef ref, String categoryId, [ExpenseSubCategoryModel? subcategory]) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _SubcategoryFormSheet(
+    showEntryForm(context, _SubcategoryFormSheet(
         categoryId: categoryId,
         subcategory: subcategory,
       ),
@@ -290,13 +273,7 @@ class _SubcategoryTile extends ConsumerWidget {
   }
 
   void _showSubcategoryForm(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _SubcategoryFormSheet(
+    showEntryForm(context, _SubcategoryFormSheet(
         categoryId: categoryId,
         subcategory: subcategory,
       ),

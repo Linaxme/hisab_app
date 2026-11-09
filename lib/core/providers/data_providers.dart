@@ -272,11 +272,11 @@ final liveCashProvider = Provider<AsyncValue<double>>((ref) {
   final salesTotals = ref.watch(salesTotalsProvider);
   final expensesTotals = ref.watch(expensesTotalsProvider);
   final deposits = ref.watch(depositsByDateProvider);
-  final returnsTotal = ref.watch(returnsTotalProvider);
+  final returns = ref.watch(returnsByDateProvider);
   final collections = ref.watch(collectionsByDateProvider);
 
   final sources = <AsyncValue<Object?>>[
-    opening, salesTotals, expensesTotals, deposits, returnsTotal, collections,
+    opening, salesTotals, expensesTotals, deposits, returns, collections,
   ];
   for (final source in sources) {
     if (source.hasError && !source.hasValue) {
@@ -292,7 +292,10 @@ final liveCashProvider = Provider<AsyncValue<double>>((ref) {
       .where((d) => !d.isAutoCreated)
       .fold<double>(0.0, (sum, d) => sum + d.amount);
   final creditCollections = collections.value!.fold<double>(0.0, (sum, c) => sum + c.amount);
+  final cashReturns = returns.value!
+      .where((r) => r.isCash)
+      .fold<double>(0.0, (sum, r) => sum + r.amount);
 
   return AsyncData(openingCash + cashSales + creditCollections - manualDepositsTotal -
-      cashExpenses - returnsTotal.value!);
+      cashExpenses - cashReturns);
 });

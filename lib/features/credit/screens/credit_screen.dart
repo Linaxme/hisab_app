@@ -268,12 +268,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
   }
 
   void _showCreditDetails(BuildContext context, CreditSaleModel creditSale) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CreditDetailsSheet(creditSale: creditSale),
-    );
+    showEntryForm(context, _CreditDetailsSheet(creditSale: creditSale));
   }
 
   Future<void> _deleteCreditSale(CreditSaleModel creditSale) async {
@@ -1179,18 +1174,11 @@ class _CreditDetailsSheet extends ConsumerWidget {
     final repository = ref.watch(creditRepositoryProvider);
 
     return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBackground : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
+      color: isDark ? AppTheme.darkBackground : Colors.white,
+      child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1382,8 +1370,6 @@ class _CreditDetailsSheet extends ConsumerWidget {
                   ),
               ],
             ),
-          );
-        },
       ),
     );
   }

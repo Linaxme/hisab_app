@@ -41,6 +41,7 @@ class DayFlow {
   final double totalSales;
   final double totalExpenses;
   final double savings;
+  final double returns;
   final double profit;
 
   const DayFlow({
@@ -50,6 +51,7 @@ class DayFlow {
     this.totalSales = 0,
     this.totalExpenses = 0,
     this.savings = 0,
+    this.returns = 0,
     this.profit = 0,
   });
 
@@ -136,7 +138,7 @@ final dayActivityProvider = Provider.autoDispose<AsyncValue<List<ActivityEntry>>
         kind: ActivityKind.returned,
         time: r.createdAt,
         amount: r.amount,
-        cashEffect: -1,
+        cashEffect: r.isCash ? -1 : 0,
         label: _nonEmpty(r.note),
         source: r,
       ),
@@ -147,7 +149,8 @@ final dayActivityProvider = Provider.autoDispose<AsyncValue<List<ActivityEntry>>
 
 final dayFlowProvider = Provider.autoDispose<AsyncValue<DayFlow>>((ref) {
   return ref.watch(dayActivityProvider).whenData((entries) {
-    double cashIn = 0, cashOut = 0, digital = 0, sales = 0, expenses = 0, savings = 0, profit = 0;
+    double cashIn = 0, cashOut = 0, digital = 0, sales = 0, expenses = 0, savings = 0,
+        returns = 0, profit = 0;
     for (final e in entries) {
       if (e.cashEffect > 0) cashIn += e.amount;
       if (e.cashEffect < 0) cashOut += e.amount;
@@ -160,6 +163,8 @@ final dayFlowProvider = Provider.autoDispose<AsyncValue<DayFlow>>((ref) {
           savings += e.amount;
         case ActivityKind.expense:
           expenses += e.amount;
+        case ActivityKind.returned:
+          returns += e.amount;
         default:
           break;
       }
@@ -171,6 +176,7 @@ final dayFlowProvider = Provider.autoDispose<AsyncValue<DayFlow>>((ref) {
       totalSales: sales,
       totalExpenses: expenses,
       savings: savings,
+      returns: returns,
       profit: profit,
     );
   });

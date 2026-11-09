@@ -259,7 +259,9 @@ class _ReturnCard extends StatelessWidget {
       color: AppTheme.violetColor,
       title: returnItem.note ?? tr(locale, 'return_default_note'),
       subtitle: Text(
-        returnItem.date,
+        returnItem.isCash
+            ? returnItem.date
+            : '${returnItem.date} · ক্যাশের বাইরে',
         style: Theme.of(context).textTheme.bodySmall,
       ),
       amount: CurrencyFormatter.formatNoDecimal(returnItem.amount),
@@ -282,6 +284,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
+  PaymentType _paymentType = PaymentType.cash;
   bool _isLoading = false;
 
   @override
@@ -290,6 +293,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
     if (widget.returnItem != null) {
       _amountController.text = widget.returnItem!.amount.toStringAsFixed(0);
       _noteController.text = widget.returnItem!.note ?? '';
+      _paymentType = widget.returnItem!.paymentType;
     }
   }
 
@@ -322,6 +326,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
         note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
+        paymentType: _paymentType,
         date: widget.returnItem?.date ?? dateStr,
         createdBy: currentUser.uid,
         createdAt: widget.returnItem?.createdAt ?? DateTime.now(),
@@ -439,6 +444,34 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Paid from the cash box or from elsewhere
+              Row(
+                children: [
+                  Expanded(
+                    child: PaymentTypeButton(
+                      label: 'ক্যাশ থেকে',
+                      icon: Icons.point_of_sale_rounded,
+                      isSelected: _paymentType == PaymentType.cash,
+                      color: AppTheme.errorColor,
+                      onTap: () =>
+                          setState(() => _paymentType = PaymentType.cash),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: PaymentTypeButton(
+                      label: 'ক্যাশের বাইরে',
+                      icon: Icons.account_balance_wallet_outlined,
+                      isSelected: _paymentType == PaymentType.noncash,
+                      color: AppTheme.errorColor,
+                      onTap: () =>
+                          setState(() => _paymentType = PaymentType.noncash),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 

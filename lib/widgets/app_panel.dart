@@ -1,29 +1,25 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
-import '../core/utils/responsive.dart';
 import 'entry_form.dart';
 
-/// Opens [panel] as a centred dialog on wide screens and a bottom sheet on phones.
+/// Opens [panel] as a centred popup.
 Future<T?> showAppPanel<T>(BuildContext context, Widget panel, {double maxWidth = 560}) {
-  if (context.isWide) {
-    return showDialog<T>(
-      context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
+  return showDialog<T>(
+    context: context,
+    builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        // The dialog already sits above the keyboard.
+        child: MediaQuery.removeViewInsets(
+          context: context,
+          removeBottom: true,
           child: panel,
         ),
       ),
-    );
-  }
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => panel,
+    ),
   );
 }
 
@@ -44,16 +40,9 @@ class AppPanelFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = context.isWide;
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-      decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
-        borderRadius: wide ? null : const BorderRadius.vertical(top: Radius.circular(28)),
-        border: wide
-            ? null
-            : Border(top: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.35))),
-      ),
+      color: AppTheme.darkSurface,
       child: SafeArea(
         top: false,
         child: Padding(

@@ -555,6 +555,8 @@ class _FlowCard extends ConsumerWidget {
                 _MiniStat(label: t('today_expenses'), value: money(flow.totalExpenses), color: AppTheme.errorColor),
               if (flow.savings > 0)
                 _MiniStat(label: t('savings'), value: money(flow.savings), color: AppTheme.successColor),
+              if (prefs.showReturns)
+                _MiniStat(label: t('report_returns'), value: money(flow.returns), color: AppTheme.violetColor),
               if (showProfit)
                 _MiniStat(label: t('today_profit'), value: money(flow.profit), color: AppTheme.violetColor),
             ],
