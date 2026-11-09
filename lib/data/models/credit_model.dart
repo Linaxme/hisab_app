@@ -47,6 +47,7 @@ class CreditSaleModel {
       'customerPhone': customerPhone,
       'amount': amount,
       'collectedAmount': collectedAmount,
+      'isPaid': isFullyPaid,
       'date': date,
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
@@ -59,6 +60,7 @@ class CreditSaleModel {
       'customerName': customerName,
       'customerPhone': customerPhone,
       'amount': amount,
+      'isPaid': isFullyPaid,
       'date': date,
       'updatedAt': FieldValue.serverTimestamp(),
     };

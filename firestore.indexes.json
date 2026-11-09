@@ -24,6 +24,14 @@
         { "fieldPath": "date", "order": "ASCENDING" },
         { "fieldPath": "sellPrice", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "creditSales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPaid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

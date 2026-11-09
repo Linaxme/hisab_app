@@ -42,6 +42,26 @@ class CreditRepository {
     });
   }
 
+  // Newest [limit] credit sales, optionally only unpaid ones
+  Stream<List<CreditSaleModel>> watchRecentCreditSales({
+    required int limit,
+    bool pendingOnly = false,
+  }) async* {
+    Query<Map<String, dynamic>> query = _creditSalesCollection;
+    if (pendingOnly) query = query.where('isPaid', isEqualTo: false);
+    query = query.orderBy('createdAt', descending: true).limit(limit);
+    try {
+      await for (final snapshot in query.snapshots()) {
+        yield snapshot.docs.map((doc) => CreditSaleModel.fromFirestore(doc)).toList();
+      }
+    } on FirebaseException catch (e) {
+      // The unpaid filter needs a composite index; until it exists, filter locally.
+      if (e.code != 'failed-precondition') rethrow;
+      yield* watchCreditSales(pendingOnly: pendingOnly)
+          .map((sales) => sales.take(limit).toList());
+    }
+  }
+
   // Get credit sales by date
   Stream<List<CreditSaleModel>> watchCreditSalesByDate(String date) {
     return _creditSalesCollection
@@ -102,13 +122,18 @@ class CreditRepository {
 
   // ============ CREDIT COLLECTIONS ============
 
-  // Add collection and update credit sale's collected amount atomically
-  Future<String> addCollection(CreditCollectionModel collection) async {
+  // Add collection and update credit sale's collected amount atomically.
+  // [settles] marks the credit as fully paid by this collection.
+  Future<String> addCollection(
+    CreditCollectionModel collection, {
+    bool settles = false,
+  }) async {
     final batch = _firestore.batch();
     final docRef = _collectionsCollection.doc();
     batch.set(docRef, collection.toFirestore());
     batch.update(_creditSalesCollection.doc(collection.creditSaleId), {
       'collectedAmount': FieldValue.increment(collection.amount),
+      'isPaid': settles,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
@@ -146,6 +171,8 @@ class CreditRepository {
     batch.delete(_collectionsCollection.doc(collectionId));
     batch.update(_creditSalesCollection.doc(creditSaleId), {
       'collectedAmount': FieldValue.increment(-amount),
+      // Collections never exceed the due amount, so removing one leaves a balance.
+      'isPaid': false,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();

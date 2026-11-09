@@ -245,7 +245,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 isLoading: _isLoading,
                 onPressed: _register,
               ).animate().fadeIn(delay: 380.ms).slideY(begin: 0.2),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'রেজিস্টার করলে আপনি আমাদের ',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => context.push('/privacy'),
+                    child: const Text(
+                      'গোপনীয়তা নীতি',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '-তে সম্মত হচ্ছেন',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 400.ms),
+              const SizedBox(height: 10),
 
               Wrap(
                 alignment: WrapAlignment.center,

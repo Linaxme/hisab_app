@@ -86,11 +86,16 @@ service cloud.firestore {
         )) ||
         (resource.data.role == 'staff' &&
          isActiveOwner(resource.data.shopId) &&
-         changedKeys().hasOnly(['active', 'updatedAt']))
+         changedKeys().hasOnly(['active', 'updatedAt'])) ||
+        // Owner deleting their shop detaches its staff
+        (resource.data.role == 'staff' &&
+         isActiveOwner(resource.data.shopId) &&
+         changedKeys().hasOnly(['shopId', 'updatedAt']) &&
+         request.resource.data.shopId == null)
       );
       
-      // Prevent deletion
-      allow delete: if false;
+      // Users can delete their own account
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // ============================================
@@ -124,8 +129,9 @@ service cloud.firestore {
       allow update: if isActiveOwner(shopId) &&
         request.resource.data.ownerUid == resource.data.ownerUid;
       
-      // Prevent deletion
-      allow delete: if false;
+      // Only the creating owner can delete the shop (account deletion)
+      allow delete: if isActiveOwner(shopId) &&
+        resource.data.ownerUid == request.auth.uid;
       
       // ============================================
       // OPENING CASH SUBCOLLECTION
@@ -134,11 +140,8 @@ service cloud.firestore {
         // Anyone in shop can read
         allow read: if canAccessShop(shopId);
         
-        // Only owner can create/update
-        allow create, update: if isActiveOwner(shopId);
-        
-        // Prevent deletion
-        allow delete: if false;
+        // Only owner can create/update/delete
+        allow create, update, delete: if isActiveOwner(shopId);
       }
       
       // ============================================
@@ -272,7 +275,7 @@ service cloud.firestore {
         allow update: if canAccessShop(shopId) && (
           resource.data.createdBy == request.auth.uid || 
           isShopOwner(shopId) ||
-          changedKeys().hasOnly(['collectedAmount', 'updatedAt'])
+          changedKeys().hasOnly(['collectedAmount', 'isPaid', 'updatedAt'])
         );
         
         // Creator or owner can delete

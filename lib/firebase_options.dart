@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDoULbRw-1M82qE8PjHUx8926swuQjVEl0',
-    appId: '1:699268160570:android:10fd99cee7562f0d29e903',
+    appId: '1:699268160570:android:5a0e7173c5db0fab29e903',
     messagingSenderId: '699268160570',
     projectId: 'hisab-app-2b647',
     storageBucket: 'hisab-app-2b647.firebasestorage.app',

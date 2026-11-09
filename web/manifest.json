@@ -1,11 +1,11 @@
 {
-    "name": "hisab_apps",
-    "short_name": "hisab_apps",
+    "name": "আমার দোকান",
+    "short_name": "আমার দোকান",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "দোকানের বিক্রি, খরচ আর বাকির হিসাব",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

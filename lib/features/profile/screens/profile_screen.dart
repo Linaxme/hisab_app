@@ -165,6 +165,159 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Future<void> _deleteAccount(bool isOwner) async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: AppTheme.errorColor,
+          size: 40,
+        ),
+        title: const Text('অ্যাকাউন্ট মুছে ফেলবেন?'),
+        content: Text(
+          isOwner
+              ? 'আপনার অ্যাকাউন্ট এবং আপনার দোকানের সব হিসাব (বিক্রি, খরচ, জমা, '
+                    'রিটার্ন, বাকি, পণ্য, ওপেনিং ক্যাশ) স্থায়ীভাবে মুছে যাবে। '
+                    'স্টাফরা আর এই দোকানে ঢুকতে পারবে না।\n\n'
+                    'এটি আর ফেরত আনা যাবে না।'
+              : 'আপনার অ্যাকাউন্ট স্থায়ীভাবে মুছে যাবে। আপনার লেখা হিসাব '
+                    'দোকানের রেকর্ডে থেকে যাবে।\n\nএটি আর ফেরত আনা যাবে না।',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('বাতিল'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+            child: const Text('এগিয়ে যান'),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+
+    // The router may redirect away mid-deletion, so finish with references
+    // captured now rather than this widget's context.
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final authRepository = ref.read(authRepositoryProvider);
+    final passwordController = TextEditingController();
+    bool obscure = true;
+    bool deleting = false;
+    String? error;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> confirm() async {
+            final password = passwordController.text;
+            if (password.isEmpty) {
+              setDialogState(() => error = 'পাসওয়ার্ড দিন');
+              return;
+            }
+            setDialogState(() {
+              deleting = true;
+              error = null;
+            });
+            try {
+              await authRepository.deleteAccount(password: password);
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              router.go('/login');
+              messenger.showSnackBar(
+                const SnackBar(content: Text('অ্যাকাউন্ট মুছে ফেলা হয়েছে')),
+              );
+            } catch (e) {
+              final message = e.toString();
+              final text =
+                  message.contains('wrong-password') ||
+                      message.contains('invalid-credential')
+                  ? 'পাসওয়ার্ড ভুল'
+                  : message.contains('too-many-requests')
+                  ? 'অনেকবার চেষ্টা হয়েছে, কিছুক্ষণ পরে আবার চেষ্টা করুন'
+                  : message.contains('network') ||
+                      message.contains('unavailable')
+                  ? 'ইন্টারনেট সংযোগ দরকার'
+                  : 'মুছে ফেলা যায়নি: $message';
+              if (dialogContext.mounted) {
+                setDialogState(() {
+                  deleting = false;
+                  error = text;
+                });
+              }
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text('পাসওয়ার্ড দিয়ে নিশ্চিত করুন'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscure,
+                  enabled: !deleting,
+                  autofocus: true,
+                  onSubmitted: (_) => confirm(),
+                  decoration: InputDecoration(
+                    labelText: 'পাসওয়ার্ড',
+                    errorText: error,
+                    errorMaxLines: 3,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setDialogState(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+                if (deleting) ...[
+                  const SizedBox(height: 16),
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'মুছে ফেলা হচ্ছে… অ্যাপ বন্ধ করবেন না',
+                    style: Theme.of(dialogContext).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: deleting
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text('বাতিল'),
+              ),
+              TextButton(
+                onPressed: deleting ? null : confirm,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.errorColor,
+                ),
+                child: const Text('স্থায়ীভাবে মুছুন'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    passwordController.dispose();
+  }
+
   Future<void> _showChangePasswordDialog() async {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -711,6 +864,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                   ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2),
+
+                  const SizedBox(height: 24),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => context.push('/privacy'),
+                        icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                        label: const Text('গোপনীয়তা নীতি'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _deleteAccount(user.isOwner),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.errorColor,
+                        ),
+                        icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                        label: const Text('অ্যাকাউন্ট মুছুন'),
+                      ),
+                    ],
+                  ).animate().fadeIn(delay: 340.ms),
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/theme/app_theme.dart';
@@ -44,9 +45,16 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
 
   @override
   Widget build(BuildContext context) {
-    final creditSalesAsync = _showPendingOnly
-        ? ref.watch(pendingCreditSalesProvider)
-        : ref.watch(creditSalesProvider);
+    // Search has to look through every credit; otherwise show pages.
+    final searching = _searchQuery.isNotEmpty;
+    final limit = ref.watch(creditListLimitProvider);
+    final creditSalesAsync = searching
+        ? ref.watch(creditSalesProvider).whenData(
+            (all) => _showPendingOnly
+                ? all.where((s) => !s.isFullyPaid).toList()
+                : all,
+          )
+        : ref.watch(recentCreditSalesProvider(_showPendingOnly));
     final summaryAsync = ref.watch(creditSummaryProvider);
     final locale = ref.watch(languageProvider);
 
@@ -76,9 +84,11 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                             ? AppTheme.warningColor
                             : AppTheme.primaryColor,
                         showChevron: false,
-                        onTap: () => setState(
-                          () => _showPendingOnly = !_showPendingOnly,
-                        ),
+                        onTap: () {
+                          ref.read(creditListLimitProvider.notifier).state =
+                              AppConstants.pageSize;
+                          setState(() => _showPendingOnly = !_showPendingOnly);
+                        },
                       ),
                     ],
                   ).animate().fadeIn().slideX(begin: -0.05),
@@ -181,6 +191,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
             // Credit Sales List
             Expanded(
               child: creditSalesAsync.when(
+                skipLoadingOnReload: true,
                 data: (creditSales) {
                   // Filter by search query
                   final filteredCredits = _searchQuery.isEmpty
@@ -203,10 +214,30 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                         ? _EmptySearchState(query: _searchQuery)
                         : _EmptyState();
                   }
+                  final hasMore = !searching && creditSales.length >= limit;
                   return ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                    itemCount: filteredCredits.length,
+                    itemCount: filteredCredits.length + (hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index == filteredCredits.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: creditSalesAsync.isLoading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : OutlinedButton.icon(
+                                    onPressed: () => ref
+                                        .read(creditListLimitProvider.notifier)
+                                        .state += AppConstants.pageSize,
+                                    icon: const Icon(Icons.expand_more_rounded),
+                                    label: const Text('আরও দেখুন'),
+                                  ),
+                          ),
+                        );
+                      }
                       final sale = filteredCredits[index];
                       return _CreditSaleCard(
                             creditSale: sale,
@@ -216,7 +247,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                             onDelete: () => _deleteCreditSale(sale),
                           )
                           .animate()
-                          .fadeIn(delay: (100 * index).ms)
+                          .fadeIn(delay: (40 * (index % AppConstants.pageSize)).ms)
                           .slideX(begin: 0.1);
                     },
                   );
@@ -993,7 +1024,10 @@ class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
         createdAt: DateTime.now(),
       );
 
-      await repository.addCollection(collection);
+      await repository.addCollection(
+        collection,
+        settles: amount >= widget.creditSale.remainingAmount,
+      );
 
       // Refresh providers to update UI
       ref.invalidate(creditSalesProvider);

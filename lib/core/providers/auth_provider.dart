@@ -192,4 +192,104 @@ class AuthRepository {
     // Update password
     await user.updatePassword(newPassword);
   }
+
+  static const _shopSubcollections = [
+    'sales',
+    'expenses',
+    'deposits',
+    'returns',
+    'creditSales',
+    'creditCollections',
+    'products',
+    'openingCash',
+  ];
+  static const _deleteChunk = 200;
+  static const _server = GetOptions(source: Source.server);
+
+  /// Permanently delete the signed-in account. When a shop owner deletes their
+  /// account, the shop and every record in it are deleted and staff are
+  /// detached. A staff member's own entries stay with the shop.
+  Future<void> deleteAccount({required String password}) async {
+    final user = auth.currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('No user logged in');
+    }
+
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: user.email!, password: password),
+    );
+
+    final userRef = firestore.collection('users').doc(user.uid);
+    final userDoc = await userRef.get(_server);
+    final data = userDoc.data();
+    final shopId = data?['shopId'] as String?;
+
+    if (data?['role'] == 'owner' && shopId != null) {
+      final shopRef = firestore.collection('shops').doc(shopId);
+      final shopDoc = await shopRef.get(_server);
+      if (shopDoc.exists && shopDoc.data()?['ownerUid'] == user.uid) {
+        await _deleteShop(shopRef, shopDoc.data()?['inviteCode'] as String?);
+      }
+    }
+
+    if (userDoc.exists) await userRef.delete();
+    await user.delete();
+  }
+
+  Future<void> _deleteShop(
+    DocumentReference<Map<String, dynamic>> shopRef,
+    String? inviteCode,
+  ) async {
+    final staff = await firestore
+        .collection('users')
+        .where('shopId', isEqualTo: shopRef.id)
+        .where('role', isEqualTo: 'staff')
+        .get(_server);
+    for (var i = 0; i < staff.docs.length; i += _deleteChunk) {
+      final batch = firestore.batch();
+      for (final doc in staff.docs.skip(i).take(_deleteChunk)) {
+        batch.update(doc.reference, {
+          'shopId': null,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+
+    final categories = await shopRef.collection('expenseCategories').get(_server);
+    for (final category in categories.docs) {
+      await _deleteAll(category.reference.collection('subcategories'));
+    }
+    await _deleteAll(shopRef.collection('expenseCategories'));
+    for (final name in _shopSubcollections) {
+      await _deleteAll(shopRef.collection(name));
+    }
+
+    if (inviteCode != null && inviteCode.isNotEmpty) {
+      final codeRef = firestore.collection('inviteCodes').doc(inviteCode);
+      final codeDoc = await codeRef.get(_server);
+      if (codeDoc.data()?['shopId'] == shopRef.id) await codeRef.delete();
+    }
+    await shopRef.delete();
+  }
+
+  Future<void> _deleteAll(Query<Map<String, dynamic>> query) async {
+    while (true) {
+      final snapshot = await query.limit(_deleteChunk).get(_server);
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      try {
+        await batch.commit();
+      } on FirebaseException catch (e) {
+        // Large batches can exceed the rules' per-request document-access limit.
+        if (e.code != 'permission-denied') rethrow;
+        await Future.wait(snapshot.docs.map((doc) => doc.reference.delete()));
+      }
+      if (snapshot.docs.length < _deleteChunk) return;
+    }
+  }
 }

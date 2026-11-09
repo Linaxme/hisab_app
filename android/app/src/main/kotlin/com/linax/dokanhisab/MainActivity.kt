@@ -1,4 +1,4 @@
-package com.example.hisab_apps
+package com.linax.dokanhisab
 
 import io.flutter.embedding.android.FlutterActivity
 

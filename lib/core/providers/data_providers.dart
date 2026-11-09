@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/app_constants.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/repositories.dart';
 import 'providers.dart';
@@ -139,17 +140,32 @@ final creditRepositoryProvider = Provider<CreditRepository?>((ref) {
   return CreditRepository(shopId: shop.id);
 });
 
-final creditSalesProvider = StreamProvider<List<CreditSaleModel>>((ref) {
+/// Every credit sale ever; only for the customer ledger and search.
+final creditSalesProvider = StreamProvider.autoDispose<List<CreditSaleModel>>((ref) {
   final repository = ref.watch(creditRepositoryProvider);
   if (repository == null) return Stream.value([]);
   return repository.watchCreditSales();
 });
 
-// Filtered from the all-credits listener instead of opening a second one.
-final pendingCreditSalesProvider = Provider<AsyncValue<List<CreditSaleModel>>>((ref) {
-  return ref.watch(creditSalesProvider).whenData(
-        (sales) => sales.where((s) => !s.isFullyPaid).toList(),
-      );
+/// How many credit sales the transaction list shows; "আরও দেখুন" adds a page.
+final creditListLimitProvider =
+    StateProvider.autoDispose<int>((ref) => AppConstants.pageSize);
+
+/// Newest credit sales up to [creditListLimitProvider]; `true` for unpaid only.
+final recentCreditSalesProvider = StreamProvider.autoDispose
+    .family<List<CreditSaleModel>, bool>((ref, pendingOnly) {
+  final repository = ref.watch(creditRepositoryProvider);
+  final limit = ref.watch(creditListLimitProvider);
+  if (repository == null) return Stream.value([]);
+  return repository.watchRecentCreditSales(limit: limit, pendingOnly: pendingOnly);
+});
+
+/// Unpaid credit sales for the collection picker.
+final pendingCreditSalesProvider =
+    StreamProvider.autoDispose<List<CreditSaleModel>>((ref) {
+  final repository = ref.watch(creditRepositoryProvider);
+  if (repository == null) return Stream.value([]);
+  return repository.watchRecentCreditSales(limit: 100, pendingOnly: true);
 });
 
 /// One credit sale, live; used where only a few are needed (e.g. names in the timeline).
@@ -174,23 +190,19 @@ final collectionsByDateProvider = StreamProvider<List<CreditCollectionModel>>((r
   return repository.watchCollectionsByDate(formatDateForQuery(date));
 });
 
-final creditSummaryProvider = Provider<AsyncValue<Map<String, double>>>((ref) {
-  return ref.watch(creditSalesProvider).whenData(summarizeCredits);
-});
-
-Map<String, double> summarizeCredits(List<CreditSaleModel> creditSales) {
-  double totalCredit = 0;
-  double totalCollected = 0;
-  for (final sale in creditSales) {
-    totalCredit += sale.amount;
-    totalCollected += sale.collectedAmount;
+/// All-time credit totals from aggregate queries; refreshed by invalidation.
+final creditSummaryProvider =
+    FutureProvider.autoDispose<Map<String, double>>((ref) async {
+  final repository = ref.watch(creditRepositoryProvider);
+  if (repository == null) {
+    return {'totalCredit': 0, 'totalCollected': 0, 'remaining': 0};
   }
-  return {
-    'totalCredit': totalCredit,
-    'totalCollected': totalCollected,
-    'remaining': totalCredit - totalCollected,
-  };
-}
+  try {
+    return await repository.getCreditSummaryAggregate();
+  } catch (_) {
+    return repository.getCreditSummary();
+  }
+});
 
 // ============ DEPOSITS PROVIDERS ============
 final depositsRepositoryProvider = Provider<DepositsRepository?>((ref) {

@@ -8,7 +8,7 @@
       "android": {
         "default": {
           "projectId": "hisab-app-2b647",
-          "appId": "1:699268160570:android:10fd99cee7562f0d29e903",
+          "appId": "1:699268160570:android:5a0e7173c5db0fab29e903",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -16,7 +16,7 @@
         "lib/firebase_options.dart": {
           "projectId": "hisab-app-2b647",
           "configurations": {
-            "android": "1:699268160570:android:10fd99cee7562f0d29e903",
+            "android": "1:699268160570:android:5a0e7173c5db0fab29e903",
             "ios": "1:699268160570:ios:a4957db1e296f89d29e903",
             "macos": "1:699268160570:ios:a4957db1e296f89d29e903",
             "web": "1:699268160570:web:25ae808899b8eac129e903",

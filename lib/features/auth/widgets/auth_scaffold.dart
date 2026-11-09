@@ -278,7 +278,7 @@ class _BrandPanel extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     const Text(
-                      'দোকান হিসাব',
+                      'আমার দোকান',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 22,
@@ -325,7 +325,7 @@ class _BrandPanel extends StatelessWidget {
                   ).animate().fadeIn(delay: (150 + 100 * i).ms).slideX(begin: -0.05),
                 const Spacer(),
                 Text(
-                  '© ${DateTime.now().year} দোকান হিসাব',
+                  '© ${DateTime.now().year} আমার দোকান',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
                 ),
               ],

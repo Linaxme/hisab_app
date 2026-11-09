@@ -61,7 +61,7 @@ class MyApp extends ConsumerWidget {
     final locale = ref.watch(languageProvider);
     
     return MaterialApp.router(
-      title: 'Shop Accounting',
+      title: 'আমার দোকান',
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,

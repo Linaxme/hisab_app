@@ -17,6 +17,7 @@ import '../../features/monthly/screens/monthly_summary_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/products_settings_screen.dart';
 import '../../features/more/screens/more_screen.dart';
+import '../../features/legal/privacy_policy_screen.dart';
 import '../../widgets/main_shell.dart';
 
 /// Auth state notifier for GoRouter refresh
@@ -50,6 +51,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = currentUser.valueOrNull;
       
       final currentPath = state.matchedLocation;
+      if (currentPath == '/privacy') return null;
+
       final isAuthRoute = currentPath == '/login' || 
                           currentPath == '/register' ||
                           currentPath == '/create-shop' ||
@@ -130,6 +133,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/join-shop',
         builder: (context, state) => const JoinShopScreen(),
+      ),
+      GoRoute(
+        path: '/privacy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
       
       // Main app routes share the shell (bottom bar on phones, sidebar on wide screens)

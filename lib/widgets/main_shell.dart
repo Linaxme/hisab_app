@@ -310,7 +310,7 @@ class _Sidebar extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'দোকান হিসাব',
+                            'আমার দোকান',
                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                           ),
                           Text(

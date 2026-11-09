@@ -2,8 +2,15 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Shop Accounting';
+  static const String appName = 'আমার দোকান';
   static const String currency = '৳';
+
+  // Shown in the privacy policy; empty values are hidden
+  static const String developerName = '';
+  static const String supportEmail = '';
+  static const String supportPhone = '';
+  static const String supportAddress = '';
+  static const String privacyPolicyUpdated = '১০ নভেম্বর ২০২৬';
   
   // Roles
   static const String roleOwner = 'owner';

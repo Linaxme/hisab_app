@@ -128,6 +128,13 @@ class MoreScreen extends ConsumerWidget {
             _MenuGroup(
               children: [
                 _MenuItem(
+                  icon: Icons.privacy_tip_rounded,
+                  color: AppTheme.infoColor,
+                  title: 'গোপনীয়তা নীতি',
+                  subtitle: 'কী তথ্য রাখা হয় ও কীভাবে মুছবেন',
+                  onTap: () => context.push('/privacy'),
+                ),
+                _MenuItem(
                   icon: Icons.logout_rounded,
                   color: AppTheme.errorColor,
                   title: t('logout'),
