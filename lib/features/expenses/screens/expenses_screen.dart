@@ -236,17 +236,29 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     if (confirm == true) {
       final repository = ref.read(expensesRepositoryProvider);
       if (repository != null) {
-        await repository.deleteExpense(expense.id);
+        try {
+          await repository.deleteExpense(expense.id);
 
-        // Refresh providers to update UI
-        ref.invalidate(expensesByDateProvider);
-        ref.invalidate(expensesTotalsProvider);
-        ref.invalidate(liveCashProvider);
+          // Refresh providers to update UI
+          ref.invalidate(expensesByDateProvider);
+          ref.invalidate(expensesTotalsProvider);
+          ref.invalidate(liveCashProvider);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr(locale, 'expense_deleted'))),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(tr(locale, 'expense_deleted'))),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  tr(locale, 'error_with_message', params: {'message': '$e'}),
+                ),
+              ),
+            );
+          }
         }
       }
     }
@@ -680,7 +692,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

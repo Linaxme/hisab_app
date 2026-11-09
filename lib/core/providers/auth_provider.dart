@@ -119,9 +119,11 @@ class AuthRepository {
   }
 
   /// Update user's shop ID
-  Future<void> updateUserShopId(String uid, String shopId) async {
+  Future<void> updateUserShopId(String uid, String shopId, {String? joinCode}) async {
     await firestore.collection('users').doc(uid).update({
       'shopId': shopId,
+      if (joinCode != null) 'joinCode': joinCode,
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 

@@ -78,11 +78,19 @@ class SettingsScreen extends ConsumerWidget {
                             );
 
                             if (confirm == true) {
-                              await ref.read(shopRepositoryProvider).regenerateInviteCode(shop.id);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Invite code regenerated')),
-                                );
+                              try {
+                                await ref.read(shopRepositoryProvider).regenerateInviteCode(shop.id);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Invite code regenerated')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to regenerate invite code: $e')),
+                                  );
+                                }
                               }
                             }
                           },

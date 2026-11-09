@@ -41,36 +41,52 @@ service cloud.firestore {
       return isShopOwner(shopId) && isActiveUser();
     }
     
+    // Check if the current user is the ownerUid recorded on the shop document
+    function isShopCreator(shopId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid;
+    }
+    
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    
     // ============================================
     // USERS COLLECTION
     // ============================================
     match /users/{userId} {
       // Users can read their own document
-      // Owners can read any user in their shop (for staff list)
+      // Owners can read/list users of their own shop only (for staff list)
       allow read: if isAuthenticated() && (
         request.auth.uid == userId ||
         (getUserData().role == 'owner' && resource.data.shopId == getUserData().shopId)
       );
       
-      // Allow list query for owners to see their staff
-      allow list: if isAuthenticated() && getUserData().role == 'owner';
-      
-      // Users can create their own document during signup
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Users can create their own document during signup, without a shop
+      allow create: if isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.resource.data.role in ['owner', 'staff'] &&
+        request.resource.data.get('shopId', null) == null &&
+        request.resource.data.active == true;
       
       // Users can update their own profile (name only)
-      // ShopId can only be updated if it's currently null (joining a shop)
+      // Owner can attach the shop they created; staff can attach a shop only with its invite code
       // Owner can update staff active status
       allow update: if isAuthenticated() && (
-        // User updating own profile
         (request.auth.uid == userId && (
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'updatedAt'])) ||
-          (resource.data.shopId == null && request.resource.data.shopId != null)
+          changedKeys().hasOnly(['name', 'updatedAt']) ||
+          (resource.data.get('shopId', null) == null &&
+           resource.data.role == 'owner' &&
+           changedKeys().hasOnly(['shopId', 'updatedAt']) &&
+           isShopCreator(request.resource.data.shopId)) ||
+          (resource.data.get('shopId', null) == null &&
+           resource.data.role == 'staff' &&
+           changedKeys().hasOnly(['shopId', 'joinCode', 'updatedAt']) &&
+           get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode)).data.shopId == request.resource.data.shopId)
         )) ||
-        // Owner updating staff status
-        (getUserData().role == 'owner' && 
-         resource.data.shopId == getUserData().shopId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt']))
+        (resource.data.role == 'staff' &&
+         isActiveOwner(resource.data.shopId) &&
+         changedKeys().hasOnly(['active', 'updatedAt']))
       );
       
       // Prevent deletion
@@ -78,18 +94,35 @@ service cloud.firestore {
     }
     
     // ============================================
+    // INVITE CODES (code -> shopId lookup for joining)
+    // ============================================
+    match /inviteCodes/{code} {
+      // Only direct lookup by exact code; listing all codes is not allowed
+      allow get: if isAuthenticated();
+      allow list: if false;
+      allow create: if isShopCreator(request.resource.data.shopId);
+      allow delete: if isShopCreator(resource.data.shopId);
+      allow update: if false;
+    }
+    
+    // ============================================
     // SHOPS COLLECTION
     // ============================================
     match /shops/{shopId} {
-      // Anyone authenticated can read shop (for join flow - checking invite code)
-      allow read: if isAuthenticated();
+      // Only the shop's own members (and its creator) can read it
+      allow get: if (isAuthenticated() && resource.data.ownerUid == request.auth.uid) ||
+        belongsToShop(shopId);
+      allow list: if false;
       
-      // Only authenticated users can create shops (they become owner)
+      // Only an owner without a shop can create one (they become its owner)
       allow create: if isAuthenticated() && 
-        request.resource.data.ownerUid == request.auth.uid;
+        request.resource.data.ownerUid == request.auth.uid &&
+        getUserData().role == 'owner' &&
+        getUserData().get('shopId', null) == null;
       
-      // Only shop owner can update shop settings
-      allow update: if isActiveOwner(shopId);
+      // Only shop owner can update shop settings; ownership cannot be transferred
+      allow update: if isActiveOwner(shopId) &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
       
       // Prevent deletion
       allow delete: if false;
@@ -235,10 +268,11 @@ service cloud.firestore {
         allow create: if canAccessShop(shopId) && 
           request.resource.data.createdBy == request.auth.uid;
         
-        // Creator or owner can update
+        // Creator or owner can update; anyone in shop can update collectedAmount (recording a collection)
         allow update: if canAccessShop(shopId) && (
           resource.data.createdBy == request.auth.uid || 
-          isShopOwner(shopId)
+          isShopOwner(shopId) ||
+          changedKeys().hasOnly(['collectedAmount', 'updatedAt'])
         );
         
         // Creator or owner can delete

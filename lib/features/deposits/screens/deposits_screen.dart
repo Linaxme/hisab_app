@@ -244,17 +244,25 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
     if (confirm == true) {
       final repository = ref.read(depositsRepositoryProvider);
       if (repository != null) {
-        await repository.deleteDeposit(deposit.id);
-        
-        // Refresh providers to update UI
-        ref.invalidate(depositsByDateProvider);
-        ref.invalidate(depositsTotalProvider);
-        ref.invalidate(liveCashProvider);
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(t('deposit_deleted'))),
-          );
+        try {
+          await repository.deleteDeposit(deposit.id);
+
+          // Refresh providers to update UI
+          ref.invalidate(depositsByDateProvider);
+          ref.invalidate(depositsTotalProvider);
+          ref.invalidate(liveCashProvider);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(t('deposit_deleted'))),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(t('error_with_message', params: {'message': '$e'}))),
+            );
+          }
         }
       }
     }
@@ -514,7 +522,7 @@ class _DepositFormSheetState extends ConsumerState<_DepositFormSheet> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

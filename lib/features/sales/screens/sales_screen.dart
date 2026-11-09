@@ -16,7 +16,7 @@ class SalesScreen extends ConsumerStatefulWidget {
 
 class _SalesScreenState extends ConsumerState<SalesScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final String _searchQuery = '';
+  String _searchQuery = '';
 
   @override
   void dispose() {
@@ -121,6 +121,30 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     ).animate().fadeIn(delay: 100.ms),
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(
+                      () => _searchQuery = value.trim().toLowerCase(),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: t('search_sales_hint'),
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear_rounded),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            ),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -248,17 +272,29 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     if (confirm == true) {
       final repository = ref.read(salesRepositoryProvider);
       if (repository != null) {
-        await repository.deleteSale(sale.id);
+        try {
+          await repository.deleteSale(sale);
 
-        // Refresh providers to update UI
-        ref.invalidate(salesByDateProvider);
-        ref.invalidate(salesTotalsProvider);
-        ref.invalidate(liveCashProvider);
+          // Refresh providers to update UI
+          ref.invalidate(salesByDateProvider);
+          ref.invalidate(salesTotalsProvider);
+          ref.invalidate(depositsByDateProvider);
+          ref.invalidate(depositsTotalProvider);
+          ref.invalidate(liveCashProvider);
 
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(t('sale_deleted'))));
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(t('sale_deleted'))));
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(t('error_with_message', params: {'message': '$e'})),
+              ),
+            );
+          }
         }
       }
     }
@@ -686,17 +722,14 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
 
     try {
       final repository = ref.read(salesRepositoryProvider);
-      final depositsRepository = ref.read(depositsRepositoryProvider);
       final currentUser = ref.read(currentUserProvider).value;
       final selectedDate = ref.read(selectedDateProvider);
 
-      if (repository == null ||
-          depositsRepository == null ||
-          currentUser == null) {
+      if (repository == null || currentUser == null) {
         throw Exception('Repository or user not available');
       }
 
-      final dateStr = formatDateForQuery(selectedDate);
+      final dateStr = widget.sale?.date ?? formatDateForQuery(selectedDate);
       final sale = SaleModel(
         id: widget.sale?.id ?? '',
         productName: _selectedProductName ?? _productNameController.text.trim(),
@@ -708,58 +741,33 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
         createdAt: widget.sale?.createdAt ?? DateTime.now(),
       );
 
-      final bool wasNonCash = widget.sale?.isCash == false;
-      final bool isNowNonCash = !sale.isCash;
+      // A non-cash sale is mirrored by an auto-created deposit
+      final autoDeposit = sale.isCash
+          ? null
+          : DepositModel(
+              id: '',
+              amount: sale.sellPrice,
+              note: t(
+                'sale_note',
+                params: {
+                  'product': sale.productName,
+                  'payment': paymentLabelFromType(t, sale.paymentType),
+                },
+              ),
+              date: dateStr,
+              createdBy: currentUser.uid,
+              createdAt: DateTime.now(),
+              isAutoCreated: true,
+            );
 
       if (widget.sale == null) {
-        // New sale
-        await repository.addSale(sale);
-
-        // If non-cash sale, create deposit automatically
-        if (isNowNonCash) {
-          final deposit = DepositModel(
-            id: '',
-            amount: sale.sellPrice,
-            note: t(
-              'sale_note',
-              params: {
-                'product': sale.productName,
-                'payment': paymentLabelFromType(t, sale.paymentType),
-              },
-            ),
-            date: dateStr,
-            createdBy: currentUser.uid,
-            createdAt: DateTime.now(),
-            isAutoCreated: true,
-          );
-          await depositsRepository.addDeposit(deposit);
-        }
+        await repository.addSale(sale, autoDeposit: autoDeposit);
       } else {
-        // Update sale
-        await repository.updateSale(sale);
-
-        // Handle deposit based on payment type change
-        if (!wasNonCash && isNowNonCash) {
-          // Changed from cash to non-cash: create deposit
-          final deposit = DepositModel(
-            id: '',
-            amount: sale.sellPrice,
-            note: t(
-              'sale_note',
-              params: {
-                'product': sale.productName,
-                'payment': paymentLabelFromType(t, sale.paymentType),
-              },
-            ),
-            date: dateStr,
-            createdBy: currentUser.uid,
-            createdAt: DateTime.now(),
-            isAutoCreated: true,
-          );
-          await depositsRepository.addDeposit(deposit);
-        }
-        // Note: We don't remove deposits if changed from non-cash to cash
-        // as that would require tracking which deposit was auto-created
+        await repository.updateSale(
+          widget.sale!,
+          sale,
+          autoDeposit: autoDeposit,
+        );
       }
 
       // Refresh providers to update UI
@@ -788,7 +796,7 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -846,7 +854,11 @@ class _SaleFormSheetState extends ConsumerState<_SaleFormSheet> {
 
                   return productsAsync.when(
                     data: (products) {
-                      final productNames = products.map((p) => p.name).toList();
+                      // Dropdown values must be unique and must include the current value
+                      final productNames = {
+                        ...products.map((p) => p.name),
+                        ?_selectedProductName,
+                      }.toList();
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

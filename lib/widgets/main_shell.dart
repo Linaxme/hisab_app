@@ -42,6 +42,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     // ignore: unused_local_variable - may be used for future feature (owner-only nav items)
     final currentUser = ref.watch(currentUserProvider).valueOrNull;
+    ref.watch(inviteCodeSyncProvider);
 
     return Scaffold(
       body: widget.child,

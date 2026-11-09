@@ -59,7 +59,6 @@ class CreditSaleModel {
       'customerName': customerName,
       'customerPhone': customerPhone,
       'amount': amount,
-      'collectedAmount': collectedAmount,
       'date': date,
       'updatedAt': FieldValue.serverTimestamp(),
     };

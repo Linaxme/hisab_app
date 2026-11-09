@@ -262,17 +262,29 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
     if (confirm == true) {
       final repository = ref.read(returnsRepositoryProvider);
       if (repository != null) {
-        await repository.deleteReturn(returnItem.id);
+        try {
+          await repository.deleteReturn(returnItem.id);
 
-        // Refresh providers to update UI
-        ref.invalidate(returnsByDateProvider);
-        ref.invalidate(returnsTotalProvider);
-        ref.invalidate(liveCashProvider);
+          // Refresh providers to update UI
+          ref.invalidate(returnsByDateProvider);
+          ref.invalidate(returnsTotalProvider);
+          ref.invalidate(liveCashProvider);
 
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(tr(locale, 'return_deleted'))));
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(tr(locale, 'return_deleted'))));
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  tr(locale, 'error_with_message', params: {'message': '$e'}),
+                ),
+              ),
+            );
+          }
         }
       }
     }
@@ -541,7 +553,7 @@ class _ReturnFormSheetState extends ConsumerState<_ReturnFormSheet> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

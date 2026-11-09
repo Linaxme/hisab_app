@@ -8,6 +8,7 @@ class DepositModel {
   final String createdBy;
   final DateTime createdAt;
   final bool isAutoCreated; // true if created from non-cash sale
+  final String? saleId; // the non-cash sale this deposit was auto-created for
 
   DepositModel({
     required this.id,
@@ -17,6 +18,7 @@ class DepositModel {
     required this.createdBy,
     required this.createdAt,
     this.isAutoCreated = false,
+    this.saleId,
   });
 
   factory DepositModel.fromFirestore(DocumentSnapshot doc) {
@@ -29,6 +31,7 @@ class DepositModel {
       createdBy: data['createdBy'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isAutoCreated: data['isAutoCreated'] ?? false,
+      saleId: data['saleId'],
     );
   }
 
@@ -40,6 +43,7 @@ class DepositModel {
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
       'isAutoCreated': isAutoCreated,
+      if (saleId != null) 'saleId': saleId,
     };
   }
 
@@ -59,6 +63,7 @@ class DepositModel {
     String? createdBy,
     DateTime? createdAt,
     bool? isAutoCreated,
+    String? saleId,
   }) {
     return DepositModel(
       id: id ?? this.id,
@@ -68,6 +73,7 @@ class DepositModel {
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       isAutoCreated: isAutoCreated ?? this.isAutoCreated,
+      saleId: saleId ?? this.saleId,
     );
   }
 }

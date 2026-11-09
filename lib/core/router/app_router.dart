@@ -98,7 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Staff access restrictions
       if (user.isStaff) {
-        final restrictedRoutes = ['/settings', '/monthly-summary'];
+        final restrictedRoutes = ['/settings', '/monthly-summary', '/products-settings'];
         if (restrictedRoutes.contains(currentPath)) {
           return '/dashboard';
         }

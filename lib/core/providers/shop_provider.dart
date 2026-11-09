@@ -13,6 +13,16 @@ final shopRepositoryProvider = Provider<ShopRepository>((ref) {
   );
 });
 
+/// Keeps the owner's invite code registered in the inviteCodes lookup collection
+final inviteCodeSyncProvider = FutureProvider<void>((ref) async {
+  final user = ref.watch(currentUserProvider).valueOrNull;
+  final shop = ref.watch(currentShopProvider).valueOrNull;
+  if (user == null || !user.isOwner || shop == null || shop.ownerUid != user.uid) {
+    return;
+  }
+  await ref.read(shopRepositoryProvider).ensureInviteCodeRegistered(shop);
+});
+
 /// Shop Repository class
 class ShopRepository {
   final FirebaseFirestore firestore;
@@ -27,12 +37,24 @@ class ShopRepository {
     return List.generate(6, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
+  CollectionReference<Map<String, dynamic>> get _inviteCodes =>
+      firestore.collection('inviteCodes');
+
+  /// Generate an invite code that is not already registered
+  Future<String> _generateUnusedInviteCode() async {
+    while (true) {
+      final code = _generateInviteCode();
+      final existing = await _inviteCodes.doc(code).get();
+      if (!existing.exists) return code;
+    }
+  }
+
   /// Create a new shop (Owner only)
   Future<String> createShop({
     required String name,
     required String ownerUid,
   }) async {
-    final inviteCode = _generateInviteCode();
+    final inviteCode = await _generateUnusedInviteCode();
     
     final shop = ShopModel(
       id: '',
@@ -46,6 +68,11 @@ class ShopRepository {
     
     // Update user with shopId
     await authRepository.updateUserShopId(ownerUid, docRef.id);
+
+    await _inviteCodes.doc(inviteCode).set({
+      'shopId': docRef.id,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
     
     // Create default expense categories
     await _createDefaultCategories(docRef.id);
@@ -58,34 +85,62 @@ class ShopRepository {
     required String inviteCode,
     required String userId,
   }) async {
-    final querySnapshot = await firestore
-        .collection('shops')
-        .where('inviteCode', isEqualTo: inviteCode.toUpperCase())
-        .limit(1)
-        .get();
+    final code = inviteCode.trim().toUpperCase();
+    final codeDoc = await _inviteCodes.doc(code).get();
+    final shopId = codeDoc.data()?['shopId'] as String?;
 
-    if (querySnapshot.docs.isEmpty) {
+    if (shopId == null) {
       return null; // Invalid invite code
     }
-
-    final shopId = querySnapshot.docs.first.id;
     
-    // Update user with shopId
-    await authRepository.updateUserShopId(userId, shopId);
+    // Update user with shopId; the security rules verify the code against inviteCodes
+    await authRepository.updateUserShopId(userId, shopId, joinCode: code);
     
     return shopId;
   }
 
   /// Regenerate invite code (Owner only)
   Future<String> regenerateInviteCode(String shopId) async {
-    final newCode = _generateInviteCode();
+    final shop = await getShopById(shopId);
+    final newCode = await _generateUnusedInviteCode();
+
+    await _inviteCodes.doc(newCode).set({
+      'shopId': shopId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
     
     await firestore.collection('shops').doc(shopId).update({
       'inviteCode': newCode,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    if (shop != null && shop.inviteCode.isNotEmpty && shop.inviteCode != newCode) {
+      final oldDoc = await _inviteCodes.doc(shop.inviteCode).get();
+      if (oldDoc.data()?['shopId'] == shopId) {
+        await oldDoc.reference.delete();
+      }
+    }
     
     return newCode;
+  }
+
+  /// Register the shop's current invite code in the lookup collection.
+  /// Shops created before the inviteCodes collection existed need this once.
+  Future<void> ensureInviteCodeRegistered(ShopModel shop) async {
+    if (shop.inviteCode.isEmpty) {
+      await regenerateInviteCode(shop.id);
+      return;
+    }
+
+    final codeDoc = await _inviteCodes.doc(shop.inviteCode).get();
+    if (!codeDoc.exists) {
+      await _inviteCodes.doc(shop.inviteCode).set({
+        'shopId': shop.id,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else if (codeDoc.data()?['shopId'] != shop.id) {
+      await regenerateInviteCode(shop.id);
+    }
   }
 
   /// Update shop settings
@@ -110,18 +165,6 @@ class ShopRepository {
     final doc = await firestore.collection('shops').doc(shopId).get();
     if (!doc.exists) return null;
     return ShopModel.fromFirestore(doc);
-  }
-
-  /// Get shop by invite code
-  Future<ShopModel?> getShopByInviteCode(String inviteCode) async {
-    final querySnapshot = await firestore
-        .collection('shops')
-        .where('inviteCode', isEqualTo: inviteCode.toUpperCase())
-        .limit(1)
-        .get();
-
-    if (querySnapshot.docs.isEmpty) return null;
-    return ShopModel.fromFirestore(querySnapshot.docs.first);
   }
 
   /// Create default expense categories for a new shop

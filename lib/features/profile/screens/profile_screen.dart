@@ -47,9 +47,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         await authRepository.updateUserName(user.uid, name);
         ref.invalidate(currentUserProvider);
       }
-      setState(() {
-        _isEditing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEditing = false;
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -70,9 +72,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -92,9 +96,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         await shopRepo.updateShopName(currentShop.id, name);
         ref.invalidate(currentShopProvider);
       }
-      setState(() {
-        _isEditingShop = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isEditingShop = false;
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(tr(locale, 'shop_name_updated'))),
@@ -115,9 +121,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoadingShop = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingShop = false;
+        });
+      }
     }
   }
 

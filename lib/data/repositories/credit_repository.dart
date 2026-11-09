@@ -70,34 +70,31 @@ class CreditRepository {
 
   // Delete credit sale (and its collections)
   Future<void> deleteCreditSale(String creditSaleId) async {
-    // Delete all collections for this credit sale
+    // Delete the credit sale and all its collections atomically
     final collectionsSnapshot = await _collectionsCollection
         .where('creditSaleId', isEqualTo: creditSaleId)
         .get();
     
+    final batch = _firestore.batch();
     for (final doc in collectionsSnapshot.docs) {
-      await doc.reference.delete();
+      batch.delete(doc.reference);
     }
-    
-    await _creditSalesCollection.doc(creditSaleId).delete();
+    batch.delete(_creditSalesCollection.doc(creditSaleId));
+    await batch.commit();
   }
 
   // ============ CREDIT COLLECTIONS ============
 
-  // Add collection and update credit sale's collected amount
+  // Add collection and update credit sale's collected amount atomically
   Future<String> addCollection(CreditCollectionModel collection) async {
-    // Add the collection
-    final docRef = await _collectionsCollection.add(collection.toFirestore());
-    
-    // Update the credit sale's collected amount
-    final creditSale = await getCreditSale(collection.creditSaleId);
-    if (creditSale != null) {
-      final newCollectedAmount = creditSale.collectedAmount + collection.amount;
-      await _creditSalesCollection.doc(collection.creditSaleId).update({
-        'collectedAmount': newCollectedAmount,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
+    final batch = _firestore.batch();
+    final docRef = _collectionsCollection.doc();
+    batch.set(docRef, collection.toFirestore());
+    batch.update(_creditSalesCollection.doc(collection.creditSaleId), {
+      'collectedAmount': FieldValue.increment(collection.amount),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
     
     return docRef.id;
   }
@@ -128,17 +125,13 @@ class CreditRepository {
 
   // Delete collection (and update credit sale's collected amount)
   Future<void> deleteCollection(String collectionId, String creditSaleId, double amount) async {
-    await _collectionsCollection.doc(collectionId).delete();
-    
-    // Update the credit sale's collected amount
-    final creditSale = await getCreditSale(creditSaleId);
-    if (creditSale != null) {
-      final newCollectedAmount = creditSale.collectedAmount - amount;
-      await _creditSalesCollection.doc(creditSaleId).update({
-        'collectedAmount': newCollectedAmount >= 0 ? newCollectedAmount : 0,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
+    final batch = _firestore.batch();
+    batch.delete(_collectionsCollection.doc(collectionId));
+    batch.update(_creditSalesCollection.doc(creditSaleId), {
+      'collectedAmount': FieldValue.increment(-amount),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
   }
 
   // ============ SUMMARY ============

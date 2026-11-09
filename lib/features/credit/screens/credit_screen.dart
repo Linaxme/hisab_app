@@ -306,17 +306,26 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
     if (confirm == true) {
       final repository = ref.read(creditRepositoryProvider);
       if (repository != null) {
-        await repository.deleteCreditSale(creditSale.id);
+        try {
+          await repository.deleteCreditSale(creditSale.id);
 
-        // Refresh providers to update UI
-        ref.invalidate(creditSalesProvider);
-        ref.invalidate(pendingCreditSalesProvider);
-        ref.invalidate(creditSummaryProvider);
+          // Refresh providers to update UI
+          ref.invalidate(creditSalesProvider);
+          ref.invalidate(pendingCreditSalesProvider);
+          ref.invalidate(creditSummaryProvider);
+          ref.invalidate(liveCashProvider);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('বাকি মুছে ফেলা হয়েছে')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('বাকি মুছে ফেলা হয়েছে')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+          }
         }
       }
     }
@@ -705,6 +714,14 @@ class _CreditSaleFormSheetState extends ConsumerState<_CreditSaleFormSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final collected = widget.creditSale?.collectedAmount ?? 0;
+    if (double.parse(_amountController.text) < collected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('বাকির পরিমাণ আদায়ের চেয়ে কম হতে পারে না')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -762,7 +779,7 @@ class _CreditSaleFormSheetState extends ConsumerState<_CreditSaleFormSheet> {
         ).showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -967,6 +984,7 @@ class _CollectionFormSheetState extends ConsumerState<_CollectionFormSheet> {
       ref.invalidate(creditSalesProvider);
       ref.invalidate(pendingCreditSalesProvider);
       ref.invalidate(creditSummaryProvider);
+      ref.invalidate(liveCashProvider);
 
       if (mounted) {
         Navigator.pop(context);
@@ -981,7 +999,7 @@ class _CollectionFormSheetState extends ConsumerState<_CollectionFormSheet> {
         ).showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1304,11 +1322,21 @@ class _CreditDetailsSheet extends ConsumerWidget {
                                 ),
                                 IconButton(
                                   onPressed: () async {
-                                    await repository.deleteCollection(
-                                      collection.id,
-                                      collection.creditSaleId,
-                                      collection.amount,
-                                    );
+                                    try {
+                                      await repository.deleteCollection(
+                                        collection.id,
+                                        collection.creditSaleId,
+                                        collection.amount,
+                                      );
+                                      ref.invalidate(creditSummaryProvider);
+                                      ref.invalidate(liveCashProvider);
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('ত্রুটি: $e')),
+                                        );
+                                      }
+                                    }
                                   },
                                   icon: const Icon(
                                     Icons.delete_rounded,
