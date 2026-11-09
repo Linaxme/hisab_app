@@ -70,6 +70,16 @@ class CreditRepository {
         );
   }
 
+  // A few credit sales with this exact phone or name, to spot an existing customer
+  Future<List<CreditSaleModel>> findCreditSales({String? phone, String? name}) async {
+    final field = phone != null ? 'customerPhone' : 'customerName';
+    final snapshot = await _creditSalesCollection
+        .where(field, isEqualTo: phone ?? name)
+        .limit(5)
+        .get();
+    return snapshot.docs.map((doc) => CreditSaleModel.fromFirestore(doc)).toList();
+  }
+
   // Update credit sale
   Future<void> updateCreditSale(CreditSaleModel creditSale) async {
     await _creditSalesCollection.doc(creditSale.id).update(creditSale.toUpdateFirestore());

@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../data/models/models.dart';
 import '../../widgets/app_panel.dart';
 import '../../widgets/entry_form.dart';
@@ -33,7 +34,7 @@ class CustomerAccount {
 String? _clean(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
 
 String _customerKey(CreditSaleModel c) {
-  final digits = c.customerPhone?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
+  final digits = PhoneUtils.digitsOf(c.customerPhone);
   if (digits.length >= 10) return 'p:${digits.substring(digits.length - 10)}';
   final name = _clean(c.customerName)?.toLowerCase();
   return name == null ? '_unknown' : 'n:$name';
@@ -98,10 +99,11 @@ class CustomerLedgerView extends ConsumerWidget {
       data: (all) {
         var accounts = groupByCustomer(all);
         if (query.isNotEmpty) {
+          final queryPhone = PhoneUtils.searchKey(query);
           accounts = accounts
               .where((a) =>
                   (a.name?.toLowerCase().contains(query) ?? false) ||
-                  (a.phone?.contains(query) ?? false))
+                  (queryPhone != null && PhoneUtils.digitsOf(a.phone).contains(queryPhone)))
               .toList();
         }
         if (accounts.isEmpty) {

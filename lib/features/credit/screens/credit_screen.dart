@@ -6,8 +6,10 @@ import '../../../core/providers/providers.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/phone_utils.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
+import '../../../data/repositories/repositories.dart';
 import '../../../widgets/entry_form.dart';
 import '../../../widgets/modern_widgets.dart';
 import '../customer_ledger.dart';
@@ -189,11 +191,10 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
                                 _searchQuery,
                               ) ??
                               false;
-                          final phoneMatch =
-                              sale.customerPhone?.toLowerCase().contains(
-                                _searchQuery,
-                              ) ??
-                              false;
+                          final queryPhone = PhoneUtils.searchKey(_searchQuery);
+                          final phoneMatch = queryPhone != null &&
+                              PhoneUtils.digitsOf(sale.customerPhone)
+                                  .contains(queryPhone);
                           return nameMatch || phoneMatch;
                         }).toList();
 
@@ -662,15 +663,20 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
         throw Exception('Repository or user not available');
       }
 
+      final phone = PhoneUtils.normalize(_customerPhoneController.text);
+      final typedName = _customerNameController.text.trim();
+      final customerName = await _resolveCustomerName(
+        repository,
+        typedName.isEmpty ? null : typedName,
+        phone,
+      );
+      if (customerName == null) return;
+
       final dateStr = formatDateForQuery(selectedDate);
       final creditSale = CreditSaleModel(
         id: widget.creditSale?.id ?? '',
-        customerName: _customerNameController.text.trim().isEmpty
-            ? null
-            : _customerNameController.text.trim(),
-        customerPhone: _customerPhoneController.text.trim().isEmpty
-            ? null
-            : _customerPhoneController.text.trim(),
+        customerName: customerName.isEmpty ? null : customerName,
+        customerPhone: phone,
         amount: double.parse(_amountController.text),
         collectedAmount: widget.creditSale?.collectedAmount ?? 0,
         date: widget.creditSale?.date ?? dateStr,
@@ -710,6 +716,89 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Checks the phone and name against earlier credit sales so one customer
+  /// does not end up under two names. Returns null when the user cancels,
+  /// '' when there is no name.
+  Future<String?> _resolveCustomerName(
+    CreditRepository repository,
+    String? name,
+    String? phone,
+  ) async {
+    final original = widget.creditSale;
+    final unchanged = original != null &&
+        PhoneUtils.normalize(original.customerPhone) == phone &&
+        (original.customerName?.trim() ?? '') == (name ?? '');
+    if (unchanged) return name ?? '';
+
+    try {
+      if (phone != null) {
+        final samePhone = await repository.findCreditSales(phone: phone);
+        final existingName = samePhone
+            .where((c) => c.id != original?.id)
+            .map((c) => c.customerName?.trim() ?? '')
+            .firstWhere((n) => n.isNotEmpty, orElse: () => '');
+        if (existingName.isNotEmpty) {
+          if (name == null) return existingName;
+          if (name.toLowerCase() != existingName.toLowerCase()) {
+            return await _ask(
+              title: 'এই নম্বর আগে থেকে আছে',
+              message: '$phone নম্বরটি "$existingName"-এর নামে আছে। একই কাস্টমার?',
+              choices: {
+                'না, "$name" রাখুন': name,
+                'হ্যাঁ, "$existingName"': existingName,
+              },
+            );
+          }
+          return name;
+        }
+      }
+
+      if (name != null && phone != null) {
+        final sameName = await repository.findCreditSales(name: name);
+        final otherPhone = sameName
+            .where((c) => c.id != original?.id)
+            .map((c) => PhoneUtils.normalize(c.customerPhone))
+            .firstWhere((p) => p != null && p != phone, orElse: () => null);
+        if (otherPhone != null) {
+          return await _ask(
+            title: 'একই নামে আরেকটি নম্বর আছে',
+            message: '"$name" নামে আগে $otherPhone নম্বর দেওয়া আছে। তবুও এই নম্বরে সেভ করবেন?',
+            choices: {'সেভ করুন': name},
+          );
+        }
+      }
+    } catch (_) {
+      // Offline or the lookup failed: save without the duplicate check.
+    }
+    return name ?? '';
+  }
+
+  Future<String?> _ask({
+    required String title,
+    required String message,
+    required Map<String, String> choices,
+  }) async {
+    if (!mounted) return null;
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('বাতিল'),
+          ),
+          for (final MapEntry(:key, :value) in choices.entries)
+            TextButton(
+              onPressed: () => Navigator.pop(context, value),
+              child: Text(key),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -754,6 +843,10 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                validator: (value) => (value ?? '').trim().isEmpty &&
+                        PhoneUtils.normalize(_customerPhoneController.text) == null
+                    ? 'নাম বা ফোন নম্বর — অন্তত একটি দিন'
+                    : null,
               ),
               const SizedBox(height: 16),
 
@@ -761,13 +854,16 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
               TextFormField(
                 controller: _customerPhoneController,
                 keyboardType: TextInputType.phone,
+                inputFormatters: PhoneUtils.inputFormatters,
                 decoration: InputDecoration(
                   labelText: 'ফোন নম্বর (ঐচ্ছিক)',
+                  hintText: '01XXXXXXXXX',
                   prefixIcon: const Icon(Icons.phone_rounded),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                validator: PhoneUtils.validate,
               ),
               const SizedBox(height: 16),
 
