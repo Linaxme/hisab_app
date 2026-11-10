@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/update/app_updater.dart';
 import '../../../widgets/app_actions.dart';
+import '../../../widgets/app_logo.dart';
 import '../../../widgets/modern_widgets.dart';
 import '../../../widgets/update_dialog.dart';
 
@@ -160,13 +161,7 @@ class MoreScreen extends ConsumerWidget {
             Center(
               child: Column(
                 children: [
-                  const IconBadge(
-                    icon: Icons.storefront_rounded,
-                    color: AppTheme.primaryColor,
-                    gradient: AppTheme.primaryGradient,
-                    size: 40,
-                    iconSize: 20,
-                  ),
+                  const AppLogo(size: 48),
                   const SizedBox(height: 8),
                   Text(
                     t('app_tagline'),

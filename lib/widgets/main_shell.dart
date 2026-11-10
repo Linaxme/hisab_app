@@ -8,6 +8,7 @@ import '../core/update/app_updater.dart';
 import '../core/utils/responsive.dart';
 import '../features/entry/new_entry_sheet.dart';
 import 'app_actions.dart';
+import 'app_logo.dart';
 import 'update_dialog.dart';
 
 class _NavItem {
@@ -299,16 +300,7 @@ class _Sidebar extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(extended ? 20 : 18, 20, 16, 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
-                    ),
-                    child: const Icon(Icons.storefront_rounded, color: AppTheme.onPrimary),
-                  ),
+                  const AppLogo(size: 46),
                   if (extended) ...[
                     const SizedBox(width: 12),
                     Expanded(

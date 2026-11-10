@@ -5,13 +5,15 @@ import '../../../core/localization/strings.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../widgets/app_logo.dart';
 
 /// Shared layout for login / register / shop setup screens.
 ///
 /// Mobile: gradient header with the form in a rounded sheet below it.
 /// Desktop: branded panel on the left, form card on the right.
 class AuthScaffold extends ConsumerWidget {
-  final IconData icon;
+  /// Header icon; null shows the app logo.
+  final IconData? icon;
   final String title;
   final String subtitle;
   final VoidCallback? onBack;
@@ -19,7 +21,7 @@ class AuthScaffold extends ConsumerWidget {
 
   const AuthScaffold({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     required this.children,
@@ -86,13 +88,13 @@ class AuthScaffold extends ConsumerWidget {
 }
 
 class _MobileHeader extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String subtitle;
   final VoidCallback? onBack;
 
   const _MobileHeader({
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     this.onBack,
@@ -135,16 +137,20 @@ class _MobileHeader extends StatelessWidget {
                             ),
                     ),
                   ),
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: AppTheme.softShadow(AppTheme.primaryColor, strength: 1.4),
-                    ),
-                    child: Icon(icon, size: 38, color: AppTheme.onPrimary),
-                  ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
+                  (icon == null
+                          ? const AppLogo(size: 88)
+                          : Container(
+                              width: 76,
+                              height: 76,
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.primaryGradient,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: AppTheme.softShadow(AppTheme.primaryColor, strength: 1.4),
+                              ),
+                              child: Icon(icon, size: 38, color: AppTheme.onPrimary),
+                            ))
+                      .animate()
+                      .scale(duration: 500.ms, curve: Curves.easeOutBack),
                   const SizedBox(height: 16),
                   Text(
                     title,
@@ -175,7 +181,7 @@ class _MobileHeader extends StatelessWidget {
 }
 
 class _FormCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String subtitle;
   final VoidCallback? onBack;
@@ -183,7 +189,7 @@ class _FormCard extends StatelessWidget {
   final List<Widget> children;
 
   const _FormCard({
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     required this.showHeader,
@@ -209,16 +215,19 @@ class _FormCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
+                if (icon == null)
+                  const AppLogo(size: 52)
+                else
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
+                    ),
+                    child: Icon(icon, color: AppTheme.onPrimary),
                   ),
-                  child: Icon(icon, color: AppTheme.onPrimary),
-                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -263,19 +272,7 @@ class _BrandPanel extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
-                      ),
-                      child: const Icon(
-                        Icons.storefront_rounded,
-                        color: AppTheme.onPrimary,
-                      ),
-                    ),
+                    const AppLogo(size: 52),
                     const SizedBox(width: 12),
                     const Text(
                       'আমার দোকান',

@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/app_panel.dart';
 import '../dashboard/day_activity.dart';
 import '../day_close/day_close_sheet.dart';
@@ -256,13 +257,7 @@ class _ReportCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
-                child: const Icon(Icons.storefront_rounded, color: AppTheme.onPrimary, size: 20),
-              ),
+              const AppLogo(size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

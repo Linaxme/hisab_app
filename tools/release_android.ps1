@@ -54,7 +54,9 @@ $manifest = [ordered]@{
   apks     = $apks
 }
 $utf8 = New-Object System.Text.UTF8Encoding $false
-[IO.File]::WriteAllText("$out\version.json", ($manifest | ConvertTo-Json -Depth 5), $utf8)
+# Escape non-ASCII so app builds that decode the body as Latin-1 (<= 1.0.6) still read Bengali notes.
+$json = [regex]::Replace(($manifest | ConvertTo-Json -Depth 5), '[^\x00-\x7F]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
+[IO.File]::WriteAllText("$out\version.json", $json, $utf8)
 [IO.File]::WriteAllText("$out\notes.md", $Notes, $utf8)
 $files += "$out\version.json"
 Write-Host "Built $tag (build $build) in $out"

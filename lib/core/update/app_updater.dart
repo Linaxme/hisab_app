@@ -48,7 +48,8 @@ class AppUpdater {
     if (response.statusCode != 200) {
       throw Exception('Update manifest: HTTP ${response.statusCode}');
     }
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    // GitHub serves release assets without a charset, so `body` would be Latin-1.
+    final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     final build = (json['build'] as num).toInt();
     if (build <= current) return null;
 

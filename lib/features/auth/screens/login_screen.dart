@@ -77,7 +77,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final locale = ref.watch(languageProvider);
 
     return AuthScaffold(
-      icon: Icons.storefront_rounded,
       title: 'স্বাগতম 👋',
       subtitle: 'আপনার দোকানের হিসাবে লগইন করুন',
       children: [
