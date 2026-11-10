@@ -544,9 +544,7 @@ class _FlowCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          _MiniStatGrid(
             children: [
               if (prefs.showTodaySales)
                 _MiniStat(label: t('total_sales'), value: money(flow.totalSales), color: AppTheme.successColor),
@@ -607,6 +605,31 @@ class _FlowFigure extends StatelessWidget {
   }
 }
 
+/// Equal-width tiles, at least three per row so phones need only two rows.
+class _MiniStatGrid extends StatelessWidget {
+  final List<Widget> children;
+
+  const _MiniStatGrid({required this.children});
+
+  static const double _gap = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = (width / 150).floor().clamp(3, children.length.clamp(3, 6));
+        final tileWidth = (width - _gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: _gap,
+          runSpacing: _gap,
+          children: [for (final child in children) SizedBox(width: tileWidth, child: child)],
+        );
+      },
+    );
+  }
+}
+
 class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
@@ -617,21 +640,25 @@ class _MiniStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-          const SizedBox(width: 6),
-          Text(value, style: AppTheme.numeric(fontSize: 13)),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            const SizedBox(width: 6),
+            Text(value, style: AppTheme.numeric(fontSize: 13)),
+          ],
+        ),
       ),
     );
   }

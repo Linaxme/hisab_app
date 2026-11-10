@@ -277,7 +277,7 @@ class MonthlySummaryScreen extends ConsumerWidget {
                               ),
                             ),
                             _SummaryItem(
-                              'ডিজিটাল পেমেন্ট',
+                              'MFS পেমেন্ট',
                               CurrencyFormatter.formatNoDecimal(
                                 data['nonCashSales'] ?? 0,
                               ),

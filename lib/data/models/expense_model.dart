@@ -169,7 +169,7 @@ class ExpenseSubCategoryModel {
     return ExpenseSubCategoryModel(
       id: doc.id,
       name: data['name'] ?? '',
-      order: data['order'] ?? 0,
+      order: (data['order'] as num?)?.toInt() ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

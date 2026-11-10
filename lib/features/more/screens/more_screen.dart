@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/localization/strings.dart';
+import '../../../core/update/app_updater.dart';
 import '../../../widgets/app_actions.dart';
 import '../../../widgets/modern_widgets.dart';
+import '../../../widgets/update_dialog.dart';
 
 /// More Screen - Settings, Profile, etc.
 class MoreScreen extends ConsumerWidget {
@@ -19,6 +21,7 @@ class MoreScreen extends ConsumerWidget {
     final isOwner = currentUser?.isOwner ?? false;
     final locale = ref.watch(languageProvider);
     String t(String key) => tr(locale, key);
+    final version = ref.watch(appVersionProvider).valueOrNull;
 
     return Scaffold(
       body: SafeArea(
@@ -134,6 +137,14 @@ class MoreScreen extends ConsumerWidget {
                   subtitle: 'কী তথ্য রাখা হয় ও কীভাবে মুছবেন',
                   onTap: () => context.push('/privacy'),
                 ),
+                if (AppUpdater.isAndroid)
+                  _MenuItem(
+                    icon: Icons.system_update_rounded,
+                    color: AppTheme.primaryColor,
+                    title: t('update_check'),
+                    subtitle: version == null ? null : tr(locale, 'app_version', params: {'version': version}),
+                    onTap: () => checkForUpdateManually(context, ref),
+                  ),
                 _MenuItem(
                   icon: Icons.logout_rounded,
                   color: AppTheme.errorColor,
@@ -163,7 +174,7 @@ class MoreScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Version 1.0.0',
+                    version == null ? '' : 'Version $version',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: AppTheme.textSecondary,
                     ),

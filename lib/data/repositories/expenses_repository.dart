@@ -154,7 +154,7 @@ class ExpensesRepository {
   Future<String> addCategory(String name, String createdBy) async {
     // Get the highest order number
     final snapshot = await _categoriesCollection.get();
-    final categories = snapshot.docs.map((doc) => doc.data()['order'] as int? ?? 0).toList();
+    final categories = snapshot.docs.map((doc) => (doc.data()['order'] as num?)?.toInt() ?? 0).toList();
     final nextOrder = categories.isEmpty ? 1 : (categories.reduce((a, b) => a > b ? a : b)) + 1;
     
     final docRef = await _categoriesCollection.add({
@@ -221,7 +221,7 @@ class ExpensesRepository {
         .doc(categoryId)
         .collection('subcategories')
         .get();
-    final orders = snapshot.docs.map((doc) => doc.data()['order'] as int? ?? 0).toList();
+    final orders = snapshot.docs.map((doc) => (doc.data()['order'] as num?)?.toInt() ?? 0).toList();
     final nextOrder = orders.isEmpty ? 1 : (orders.reduce((a, b) => a > b ? a : b)) + 1;
     
     final docRef = await _categoriesCollection
