@@ -41,24 +41,20 @@ final currentUserProvider = StreamProvider<UserModel?>((ref) {
 
 /// Current shop provider
 final currentShopProvider = StreamProvider<ShopModel?>((ref) {
-  final userAsync = ref.watch(currentUserProvider);
+  final shopId = ref.watch(currentUserProvider.select((u) => u.valueOrNull?.shopId));
   final firestore = ref.watch(firestoreProvider);
 
-  return userAsync.when(
-    data: (user) {
-      if (user == null || user.shopId == null) return Stream.value(null);
-      return firestore
-          .collection('shops')
-          .doc(user.shopId)
-          .snapshots()
-          .map((doc) {
-        if (!doc.exists) return null;
-        return ShopModel.fromFirestore(doc);
-      });
-    },
-    loading: () => Stream.value(null),
-    error: (_, __) => Stream.value(null),
-  );
+  if (shopId == null) return Stream.value(null);
+  return firestore.collection('shops').doc(shopId).snapshots().map((doc) {
+    if (!doc.exists) return null;
+    return ShopModel.fromFirestore(doc);
+  });
+});
+
+/// Id of the current shop. Repositories key off this so shop or user document
+/// edits don't tear down every Firestore listener.
+final currentShopIdProvider = Provider<String?>((ref) {
+  return ref.watch(currentShopProvider.select((s) => s.valueOrNull?.id));
 });
 
 /// Auth Repository class

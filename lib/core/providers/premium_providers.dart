@@ -15,9 +15,9 @@ final isSuperAdminProvider = Provider<bool>((ref) {
 });
 
 final shopPremiumProvider = StreamProvider<ShopPremiumModel?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return Stream.value(null);
-  return ref.watch(premiumRepositoryProvider).watchShopPremium(shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return Stream.value(null);
+  return ref.watch(premiumRepositoryProvider).watchShopPremium(shopId);
 });
 
 final stockAddonActiveProvider = Provider<bool>((ref) {

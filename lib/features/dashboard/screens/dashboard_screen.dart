@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/providers/dashboard_preferences_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/amount_input.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/localization/strings.dart';
@@ -86,18 +87,6 @@ class _DashboardContent extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(salesTotalsProvider);
-        ref.invalidate(expensesTotalsProvider);
-        ref.invalidate(depositsTotalProvider);
-        ref.invalidate(returnsTotalProvider);
-        ref.invalidate(openingCashProvider);
-        ref.invalidate(liveCashProvider);
-        ref.invalidate(salesByDateProvider);
-        ref.invalidate(expensesByDateProvider);
-        ref.invalidate(creditSalesByDateProvider);
-        ref.invalidate(collectionsByDateProvider);
-        ref.invalidate(depositsByDateProvider);
-        ref.invalidate(returnsByDateProvider);
         ref.read(liveDaySalesTotalsProvider).clear();
         ref.invalidate(daySalesTotalProvider);
         ref.invalidate(salesTrendProvider);
@@ -369,9 +358,7 @@ class _HeroHeader extends ConsumerWidget {
                           shape: BoxShape.circle,
                           boxShadow: AppTheme.softShadow(AppTheme.primaryColor, strength: 3),
                         ),
-                      )
-                          .animate(onPlay: (c) => c.repeat(reverse: true))
-                          .fade(begin: 0.35, end: 1, duration: 900.ms),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         tr(locale, 'live_cash').toUpperCase(),
@@ -934,16 +921,72 @@ class _TimelineRow extends StatelessWidget {
 }
 
 void showOpeningCashDialog(BuildContext context, WidgetRef ref) {
-  final controller = TextEditingController();
-  final openingCash = ref.read(openingCashProvider).value;
-  final locale = ref.read(languageProvider);
-  if (openingCash != null) {
-    controller.text = openingCash.amount.toStringAsFixed(0);
+  showDialog(context: context, builder: (_) => const _OpeningCashDialog());
+}
+
+class _OpeningCashDialog extends ConsumerStatefulWidget {
+  const _OpeningCashDialog();
+
+  @override
+  ConsumerState<_OpeningCashDialog> createState() => _OpeningCashDialogState();
+}
+
+class _OpeningCashDialogState extends ConsumerState<_OpeningCashDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _controller = TextEditingController();
+  OpeningCashModel? _openingCash;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _openingCash = ref.read(openingCashProvider).value;
+    final opening = _openingCash;
+    if (opening != null) _controller.text = AmountInput.format(opening.amount);
   }
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await action();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr(ref.read(languageProvider), 'error_with_message', params: {'message': e.toString()})),
+      ));
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final amount = AmountInput.parse(_controller.text)!;
+    final opening = _openingCash;
+    final repository = ref.read(openingCashRepositoryProvider);
+    final unchanged = opening != null && opening.followsPreviousDay && (opening.amount - amount).abs() < 0.5;
+    if (repository == null || unchanged) {
+      Navigator.pop(context);
+      return;
+    }
+    final dateStr = formatDateForQuery(ref.read(selectedDateProvider));
+    final uid = ref.read(currentUserProvider).value?.uid ?? '';
+    await _run(() => repository.setOpeningCash(dateStr, amount, uid));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = ref.watch(languageProvider);
+    final opening = _openingCash;
+
+    return AlertDialog(
       title: Row(
         children: [
           const IconBadge(
@@ -956,23 +999,30 @@ void showOpeningCashDialog(BuildContext context, WidgetRef ref) {
           Text(tr(locale, 'opening_cash_dialog_title')),
         ],
       ),
-      content: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        autofocus: true,
-        decoration: InputDecoration(
-          labelText: tr(locale, 'amount'),
-          prefixText: '৳ ',
-          helperText: (openingCash?.followsPreviousDay ?? false) ? tr(locale, 'opening_follows_note') : null,
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          keyboardType: AmountInput.keyboardType,
+          inputFormatters: AmountInput.inputFormatters,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: tr(locale, 'amount'),
+            prefixText: '৳ ',
+            helperText: (opening?.followsPreviousDay ?? false) ? tr(locale, 'opening_follows_note') : null,
+          ),
+          validator: (value) => AmountInput.validate(value, locale, allowZero: true),
+          onFieldSubmitted: (_) => _save(),
         ),
       ),
       actions: [
-        if (openingCash != null && !openingCash.followsPreviousDay)
+        if (opening != null && !opening.followsPreviousDay)
           TextButton(
-            onPressed: () async {
-              await ref.read(openingCashRepositoryProvider)?.followPreviousDay(openingCash.id);
-              if (context.mounted) Navigator.pop(context);
-            },
+            onPressed: _saving
+                ? null
+                : () => _run(() async {
+                      await ref.read(openingCashRepositoryProvider)?.followPreviousDay(opening.id);
+                    }),
             child: Text(tr(locale, 'opening_follow_previous')),
           ),
         TextButton(
@@ -980,33 +1030,12 @@ void showOpeningCashDialog(BuildContext context, WidgetRef ref) {
           child: Text(tr(locale, 'cancel')),
         ),
         FilledButton(
-          onPressed: () async {
-            final amount = double.tryParse(controller.text) ?? 0;
-            final repository = ref.read(openingCashRepositoryProvider);
-            final selectedDate = ref.read(selectedDateProvider);
-            final unchanged = openingCash != null &&
-                openingCash.followsPreviousDay &&
-                (openingCash.amount - amount).abs() < 0.5;
-
-            if (repository != null && !unchanged) {
-              final dateStr = formatDateForQuery(selectedDate);
-              final currentUser = ref.read(currentUserProvider).value;
-              await repository.setOpeningCash(
-                dateStr,
-                amount,
-                currentUser?.uid ?? '',
-              );
-              ref.invalidate(openingCashProvider);
-              ref.invalidate(liveCashProvider);
-            }
-
-            if (context.mounted) Navigator.pop(context);
-          },
+          onPressed: _saving ? null : _save,
           child: Text(tr(locale, 'save')),
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
 class _DateSelector extends ConsumerWidget {

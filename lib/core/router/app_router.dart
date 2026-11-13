@@ -27,7 +27,16 @@ import '../../widgets/main_shell.dart';
 class AuthStateNotifier extends ChangeNotifier {
   AuthStateNotifier(this._ref) {
     _ref.listen(authStateProvider, (_, __) => notifyListeners());
-    _ref.listen(currentUserProvider, (_, __) => notifyListeners());
+    _ref.listen(
+      currentUserProvider.select((u) => (
+            u.isLoading,
+            u.valueOrNull == null,
+            u.valueOrNull?.shopId,
+            u.valueOrNull?.isOwner,
+            u.valueOrNull?.active,
+          )),
+      (_, __) => notifyListeners(),
+    );
   }
 
   final Ref _ref;
@@ -43,7 +52,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/login',
-    debugLogDiagnostics: true,
     refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authStateProvider);
@@ -61,44 +69,37 @@ final routerProvider = Provider<GoRouter>((ref) {
                           currentPath == '/create-shop' ||
                           currentPath == '/join-shop';
 
-      debugPrint('🔐 Router redirect: path=$currentPath, isLoggedIn=$isLoggedIn, hasUser=${user != null}, shopId=${user?.shopId}');
 
       // Still loading auth state
       if (authState.isLoading) {
-        debugPrint('⏳ Auth state loading...');
         return null;
       }
 
       // Not logged in - must be on auth pages
       if (!isLoggedIn) {
-        debugPrint('❌ Not logged in, redirecting to login');
         if (currentPath == '/login' || currentPath == '/register') return null;
         return '/login';
       }
 
       // Logged in but user data still loading
       if (currentUser.isLoading) {
-        debugPrint('⏳ User data loading...');
         return null;
       }
 
       // Logged in but no user document (shouldn't happen normally)
       if (user == null) {
-        debugPrint('⚠️ User logged in but no user document');
         if (isAuthRoute) return null;
         return '/login';
       }
 
       // User has no shop yet - redirect to create/join shop
       if (user.shopId == null) {
-        debugPrint('🏪 User has no shop, redirecting to create/join');
         if (currentPath == '/create-shop' || currentPath == '/join-shop') return null;
         return user.isOwner ? '/create-shop' : '/join-shop';
       }
 
       // User has shop - redirect away from auth pages to dashboard
       if (isAuthRoute) {
-        debugPrint('✅ User has shop, redirecting to dashboard');
         return '/dashboard';
       }
 
@@ -116,7 +117,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      debugPrint('✅ No redirect needed');
       return null;
     },
     routes: [

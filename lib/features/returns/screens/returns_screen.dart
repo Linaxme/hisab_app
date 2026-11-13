@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/amount_input.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
@@ -33,7 +34,7 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -122,7 +123,7 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
                             onDelete: () => _deleteReturn(returnItem),
                           )
                           .animate()
-                          .fadeIn(delay: (100 * index).ms)
+                          .fadeIn(delay: (40 * index.clamp(0, 8)).ms)
                           .slideX(begin: 0.1);
                     },
                   );
@@ -173,11 +174,6 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
       if (repository != null) {
         try {
           await repository.deleteReturn(returnItem.id);
-
-          // Refresh providers to update UI
-          ref.invalidate(returnsByDateProvider);
-          ref.invalidate(returnsTotalProvider);
-          ref.invalidate(liveCashProvider);
 
           if (mounted) {
             ScaffoldMessenger.of(
@@ -291,7 +287,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
   void initState() {
     super.initState();
     if (widget.returnItem != null) {
-      _amountController.text = widget.returnItem!.amount.toStringAsFixed(0);
+      _amountController.text = AmountInput.format(widget.returnItem!.amount);
       _noteController.text = widget.returnItem!.note ?? '';
       _paymentType = widget.returnItem!.paymentType;
     }
@@ -322,7 +318,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
       final dateStr = formatDateForQuery(selectedDate);
       final returnModel = ReturnModel(
         id: widget.returnItem?.id ?? '',
-        amount: double.parse(_amountController.text),
+        amount: AmountInput.parse(_amountController.text)!,
         note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
@@ -337,11 +333,6 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
       } else {
         await repository.updateReturn(returnModel);
       }
-
-      // Refresh providers to update UI
-      ref.invalidate(returnsByDateProvider);
-      ref.invalidate(returnsTotalProvider);
-      ref.invalidate(liveCashProvider);
 
       if (mounted) {
         Navigator.pop(context);
@@ -412,7 +403,8 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
               // Amount
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: AmountInput.keyboardType,
+                inputFormatters: AmountInput.inputFormatters,
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: tr(locale, 'return_amount'),
@@ -422,15 +414,7 @@ class _ReturnFormSheetState extends ConsumerState<ReturnFormSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return tr(locale, 'amount_required');
-                  }
-                  if (double.tryParse(value) == null) {
-                    return tr(locale, 'amount_invalid');
-                  }
-                  return null;
-                },
+                validator: (value) => AmountInput.validate(value, locale),
               ),
               const SizedBox(height: 16),
 

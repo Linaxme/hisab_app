@@ -25,7 +25,7 @@ class _CreateShopScreenState extends ConsumerState<CreateShopScreen> {
   }
 
   Future<void> _createShop() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isLoading || !_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;

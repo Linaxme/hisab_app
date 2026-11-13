@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// "Dark luxury" theme: near-black surfaces, neon lime + gold accents,
 /// glassy cards and a geometric numeric face for money figures.
@@ -167,7 +166,10 @@ class AppTheme {
   }
 
   // ===== TYPOGRAPHY =====
-  static final String? _bodyFamily = GoogleFonts.hindSiliguri().fontFamily;
+  static const String _bodyFamily = 'HindSiliguri';
+
+  static TextStyle _body({double? fontSize, FontWeight? fontWeight, Color? color, double? height}) =>
+      TextStyle(fontFamily: _bodyFamily, fontSize: fontSize, fontWeight: fontWeight, color: color, height: height);
 
   /// Geometric face for money and counts; Bangla glyphs fall back to Hind Siliguri.
   static TextStyle numeric({
@@ -177,18 +179,20 @@ class AppTheme {
     double letterSpacing = -0.5,
     double? height,
   }) {
-    return GoogleFonts.sora(
+    return TextStyle(
+      fontFamily: 'Sora',
+      fontFamilyFallback: const [_bodyFamily],
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
       letterSpacing: letterSpacing,
       height: height,
-    ).copyWith(fontFamilyFallback: [?_bodyFamily]);
+    );
   }
 
   static TextTheme _buildTextTheme(Color primary, Color secondary) {
     TextStyle s(double size, FontWeight weight, Color color, {double? height}) =>
-        GoogleFonts.hindSiliguri(
+        _body(
           fontSize: size,
           fontWeight: weight,
           color: color,
@@ -252,7 +256,7 @@ class AppTheme {
         backgroundColor: background,
         surfaceTintColor: Colors.transparent,
         foregroundColor: text,
-        titleTextStyle: GoogleFonts.hindSiliguri(
+        titleTextStyle: _body(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: text,
@@ -279,7 +283,7 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: radius12),
-          textStyle: GoogleFonts.hindSiliguri(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: _body(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -288,7 +292,7 @@ class AppTheme {
           foregroundColor: onPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: radius12),
-          textStyle: GoogleFonts.hindSiliguri(fontSize: 16, fontWeight: FontWeight.w700),
+          textStyle: _body(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -297,14 +301,14 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: radius12),
           side: BorderSide(color: primary.withValues(alpha: 0.5)),
-          textStyle: GoogleFonts.hindSiliguri(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: _body(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primary,
           shape: RoundedRectangleBorder(borderRadius: radius12),
-          textStyle: GoogleFonts.hindSiliguri(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: _body(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
@@ -319,9 +323,9 @@ class AppTheme {
         errorBorder: OutlineInputBorder(borderRadius: radius12, borderSide: const BorderSide(color: errorColor)),
         focusedErrorBorder: OutlineInputBorder(borderRadius: radius12, borderSide: const BorderSide(color: errorColor, width: 1.6)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        labelStyle: GoogleFonts.hindSiliguri(color: subtext),
-        floatingLabelStyle: GoogleFonts.hindSiliguri(color: primary, fontWeight: FontWeight.w600),
-        hintStyle: GoogleFonts.hindSiliguri(color: subtext.withValues(alpha: 0.7)),
+        labelStyle: _body(color: subtext),
+        floatingLabelStyle: _body(color: primary, fontWeight: FontWeight.w600),
+        hintStyle: _body(color: subtext.withValues(alpha: 0.7)),
         prefixIconColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.focused) ? primary : subtext,
         ),
@@ -333,7 +337,7 @@ class AppTheme {
         elevation: 0,
         highlightElevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        extendedTextStyle: GoogleFonts.hindSiliguri(fontSize: 15, fontWeight: FontWeight.w700),
+        extendedTextStyle: _body(fontSize: 15, fontWeight: FontWeight.w700),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 70,
@@ -344,7 +348,7 @@ class AppTheme {
         indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.hindSiliguri(
+          return _body(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? text : subtext,
@@ -360,8 +364,8 @@ class AppTheme {
         indicatorColor: primary,
         selectedIconTheme: const IconThemeData(color: onPrimary),
         unselectedIconTheme: const IconThemeData(color: subtext),
-        selectedLabelTextStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700, color: text, fontSize: 12),
-        unselectedLabelTextStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w500, color: subtext, fontSize: 12),
+        selectedLabelTextStyle: _body(fontWeight: FontWeight.w700, color: text, fontSize: 12),
+        unselectedLabelTextStyle: _body(fontWeight: FontWeight.w500, color: subtext, fontSize: 12),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surface,
@@ -369,8 +373,8 @@ class AppTheme {
         unselectedItemColor: subtext,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle: GoogleFonts.hindSiliguri(fontSize: 12),
+        selectedLabelStyle: _body(fontWeight: FontWeight.w700, fontSize: 12),
+        unselectedLabelStyle: _body(fontSize: 12),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: card,
@@ -379,7 +383,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
-        titleTextStyle: GoogleFonts.hindSiliguri(fontSize: 20, fontWeight: FontWeight.w700, color: text),
+        titleTextStyle: _body(fontSize: 20, fontWeight: FontWeight.w700, color: text),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: card,
@@ -392,7 +396,7 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFF1F2228),
-        contentTextStyle: GoogleFonts.hindSiliguri(color: text, fontSize: 14),
+        contentTextStyle: _body(color: text, fontSize: 14),
         actionTextColor: primary,
         shape: RoundedRectangleBorder(
           borderRadius: radius12,
@@ -403,7 +407,7 @@ class AppTheme {
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         side: const BorderSide(color: border),
-        labelStyle: GoogleFonts.hindSiliguri(fontWeight: FontWeight.w600, color: text),
+        labelStyle: _body(fontWeight: FontWeight.w600, color: text),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
@@ -432,7 +436,7 @@ class AppTheme {
           color: const Color(0xFF2A2D33),
           borderRadius: BorderRadius.circular(8),
         ),
-        textStyle: GoogleFonts.hindSiliguri(color: text, fontSize: 12),
+        textStyle: _body(color: text, fontSize: 12),
       ),
     );
   }

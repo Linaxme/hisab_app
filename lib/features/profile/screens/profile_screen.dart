@@ -50,7 +50,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           name,
           shopId: ref.read(currentUserProvider).valueOrNull?.shopId,
         );
-        ref.invalidate(currentUserProvider);
       }
       if (mounted) {
         setState(() {
@@ -99,7 +98,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (currentShop != null) {
         final shopRepo = ref.read(shopRepositoryProvider);
         await shopRepo.updateShopName(currentShop.id, name);
-        ref.invalidate(currentShopProvider);
       }
       if (mounted) {
         setState(() {
@@ -329,6 +327,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     bool obscureCurrent = true;
     bool obscureNew = true;
     bool obscureConfirm = true;
+    bool saving = false;
 
     await showDialog(
       context: context,
@@ -428,10 +427,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ElevatedButton(
-                onPressed: () async {
-                  final currentPassword = currentPasswordController.text.trim();
-                  final newPassword = newPasswordController.text.trim();
-                  final confirmPassword = confirmPasswordController.text.trim();
+                onPressed: saving ? null : () async {
+                  final currentPassword = currentPasswordController.text;
+                  final newPassword = newPasswordController.text;
+                  final confirmPassword = confirmPasswordController.text;
 
                   // Validation
                   if (currentPassword.isEmpty ||
@@ -461,6 +460,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     return;
                   }
 
+                  setDialogState(() => saving = true);
                   try {
                     await ref
                         .read(authRepositoryProvider)
@@ -479,6 +479,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     }
                   } catch (e) {
                     if (context.mounted) {
+                      setDialogState(() => saving = false);
                       String errorMessage = 'ত্রুটি: $e';
                       if (e.toString().contains('wrong-password')) {
                         errorMessage = 'বর্তমান পাসওয়ার্ড ভুল';

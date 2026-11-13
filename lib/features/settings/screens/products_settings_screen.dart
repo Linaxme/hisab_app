@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/models.dart';
 
 class ProductsSettingsScreen extends ConsumerWidget {
   const ProductsSettingsScreen({super.key});
@@ -86,137 +87,91 @@ class ProductsSettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddProductDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController();
+  void _showAddProductDialog(BuildContext context, WidgetRef ref) => _showProductNameDialog(context, ref);
+
+  void _showEditProductDialog(BuildContext context, WidgetRef ref, ProductModel product) =>
+      _showProductNameDialog(context, ref, product: product);
+
+  void _showProductNameDialog(BuildContext context, WidgetRef ref, {ProductModel? product}) {
+    final controller = TextEditingController(text: product?.name ?? '');
+    final isEdit = product != null;
+    var saving = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('নতুন পণ্য যোগ করুন'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'পণ্যের নাম',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('বাতিল'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('পণ্যের নাম দিন')),
-                );
-                return;
-              }
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          void snack(String message) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+          }
 
-              try {
-                final repository = ref.read(productsRepositoryProvider);
-                if (repository == null) {
-                  throw Exception('Shop not found');
-                }
-                
-                await repository.addProduct(name);
-                ref.invalidate(productsProvider);
+          Future<void> save() async {
+            if (saving) return;
+            final name = controller.text.trim();
+            if (name.isEmpty) {
+              snack('পণ্যের নাম দিন');
+              return;
+            }
+            final products = ref.read(productsProvider).valueOrNull ?? const <ProductModel>[];
+            if (ProductModel.nameTaken(products, name, exceptId: product?.id)) {
+              snack('এই নামে পণ্য আগে থেকেই আছে');
+              return;
+            }
+            final repository = ref.read(productsRepositoryProvider);
+            if (repository == null) return;
 
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('পণ্য যোগ হয়েছে')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ত্রুটি: $e')),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            child: const Text('যোগ করুন', style: TextStyle(color: AppTheme.onPrimary)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditProductDialog(BuildContext context, WidgetRef ref, product) {
-    final controller = TextEditingController(text: product.name);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('পণ্য সম্পাদনা করুন'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'পণ্যের নাম',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('বাতিল'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('পণ্যের নাম দিন')),
-                );
-                return;
-              }
-
-              try {
-                final repository = ref.read(productsRepositoryProvider);
-                if (repository == null) {
-                  throw Exception('Shop not found');
-                }
-                
+            setDialogState(() => saving = true);
+            try {
+              if (isEdit) {
                 await repository.updateProduct(product.id, name);
-                ref.invalidate(productsProvider);
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('পণ্য আপডেট হয়েছে')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ত্রুটি: $e')),
-                  );
-                }
+              } else {
+                await repository.addProduct(name);
               }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+              snack(isEdit ? 'পণ্য আপডেট হয়েছে' : 'পণ্য যোগ হয়েছে');
+            } catch (e) {
+              if (dialogContext.mounted) setDialogState(() => saving = false);
+              snack('ত্রুটি: $e');
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(isEdit ? 'পণ্য সম্পাদনা করুন' : 'নতুন পণ্য যোগ করুন'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 50,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => save(),
+              decoration: InputDecoration(
+                labelText: 'পণ্যের নাম',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
-            child: const Text('সেভ করুন', style: TextStyle(color: AppTheme.onPrimary)),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('বাতিল'),
+              ),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                ),
+                child: Text(
+                  isEdit ? 'সেভ করুন' : 'যোগ করুন',
+                  style: const TextStyle(color: AppTheme.onPrimary),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
-
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, product) {
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, ProductModel product) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -237,7 +192,6 @@ class ProductsSettingsScreen extends ConsumerWidget {
                 }
                 
                 await repository.deleteProduct(product.id);
-                ref.invalidate(productsProvider);
 
                 if (context.mounted) {
                   Navigator.pop(context);

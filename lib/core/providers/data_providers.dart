@@ -23,9 +23,9 @@ String formatDateForQuery(DateTime date) {
 
 // ============ PRODUCTS PROVIDERS ============
 final productsRepositoryProvider = Provider<ProductsRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return ProductsRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return ProductsRepository(shopId: shopId);
 });
 
 final productsProvider = StreamProvider<List<ProductModel>>((ref) {
@@ -36,9 +36,9 @@ final productsProvider = StreamProvider<List<ProductModel>>((ref) {
 
 // ============ SALES PROVIDERS ============
 final salesRepositoryProvider = Provider<SalesRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return SalesRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return SalesRepository(shopId: shopId);
 });
 
 /// Latest sales total of every day seen live this session, newer than any fetched copy.
@@ -82,9 +82,9 @@ final salesTotalsProvider = Provider<AsyncValue<Map<String, double>>>((ref) {
 
 // ============ EXPENSES PROVIDERS ============
 final expensesRepositoryProvider = Provider<ExpensesRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return ExpensesRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return ExpensesRepository(shopId: shopId);
 });
 
 final expensesByDateProvider = StreamProvider<List<ExpenseModel>>((ref) {
@@ -127,7 +127,8 @@ final savingsCategoryIdsProvider = Provider<Set<String>>((ref) {
   return {for (final c in categories) if (c.isSavings) c.id};
 });
 
-final expenseSubcategoriesProvider = StreamProvider.family<List<ExpenseSubCategoryModel>, String>((ref, categoryId) {
+final expenseSubcategoriesProvider =
+    StreamProvider.autoDispose.family<List<ExpenseSubCategoryModel>, String>((ref, categoryId) {
   final repository = ref.watch(expensesRepositoryProvider);
   if (repository == null) return Stream.value([]);
   return repository.watchSubcategories(categoryId);
@@ -135,9 +136,9 @@ final expenseSubcategoriesProvider = StreamProvider.family<List<ExpenseSubCatego
 
 // ============ CREDIT PROVIDERS ============
 final creditRepositoryProvider = Provider<CreditRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return CreditRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return CreditRepository(shopId: shopId);
 });
 
 /// Every credit sale ever; only for the customer ledger and search.
@@ -206,9 +207,9 @@ final creditSummaryProvider =
 
 // ============ DEPOSITS PROVIDERS ============
 final depositsRepositoryProvider = Provider<DepositsRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return DepositsRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return DepositsRepository(shopId: shopId);
 });
 
 final depositsByDateProvider = StreamProvider<List<DepositModel>>((ref) {
@@ -228,9 +229,9 @@ final depositsTotalProvider = Provider<AsyncValue<double>>((ref) {
 
 // ============ RETURNS PROVIDERS ============
 final returnsRepositoryProvider = Provider<ReturnsRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return ReturnsRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return ReturnsRepository(shopId: shopId);
 });
 
 final returnsByDateProvider = StreamProvider<List<ReturnModel>>((ref) {
@@ -250,9 +251,9 @@ final returnsTotalProvider = Provider<AsyncValue<double>>((ref) {
 
 // ============ OPENING CASH PROVIDERS ============
 final openingCashRepositoryProvider = Provider<OpeningCashRepository?>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return null;
-  return OpeningCashRepository(shopId: shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return null;
+  return OpeningCashRepository(shopId: shopId);
 });
 
 final openingCashProvider = StreamProvider<OpeningCashModel?>((ref) {
@@ -270,40 +271,4 @@ final cashChecksProvider = StreamProvider<List<CashCheckModel>>((ref) {
   final date = ref.watch(selectedDateProvider);
   if (repository == null) return Stream.value(const []);
   return repository.watchCashChecks(formatDateForQuery(date));
-});
-
-// ============ LIVE CASH PROVIDER ============
-// LiveCash = OpeningCash + CashSales + CreditCollections - ManualDeposits - CashExpenses - Returns
-// Note: Auto-created deposits from non-cash sales are excluded
-final liveCashProvider = Provider<AsyncValue<double>>((ref) {
-  final opening = ref.watch(openingCashProvider);
-  final salesTotals = ref.watch(salesTotalsProvider);
-  final expensesTotals = ref.watch(expensesTotalsProvider);
-  final deposits = ref.watch(depositsByDateProvider);
-  final returns = ref.watch(returnsByDateProvider);
-  final collections = ref.watch(collectionsByDateProvider);
-
-  final sources = <AsyncValue<Object?>>[
-    opening, salesTotals, expensesTotals, deposits, returns, collections,
-  ];
-  for (final source in sources) {
-    if (source.hasError && !source.hasValue) {
-      return AsyncError(source.error!, source.stackTrace ?? StackTrace.current);
-    }
-  }
-  if (sources.any((s) => !s.hasValue)) return const AsyncLoading();
-
-  final openingCash = opening.value?.amount ?? 0;
-  final cashSales = salesTotals.value!['cashSales'] ?? 0;
-  final cashExpenses = expensesTotals.value!['cashExpenses'] ?? 0;
-  final manualDepositsTotal = deposits.value!
-      .where((d) => !d.isAutoCreated)
-      .fold<double>(0.0, (sum, d) => sum + d.amount);
-  final creditCollections = collections.value!.fold<double>(0.0, (sum, c) => sum + c.amount);
-  final cashReturns = returns.value!
-      .where((r) => r.isCash)
-      .fold<double>(0.0, (sum, r) => sum + r.amount);
-
-  return AsyncData(openingCash + cashSales + creditCollections - manualDepositsTotal -
-      cashExpenses - cashReturns);
 });

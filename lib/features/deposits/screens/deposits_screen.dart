@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/amount_input.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/models.dart';
 import '../../../core/utils/responsive.dart';
@@ -33,7 +34,7 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -115,7 +116,7 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
                         locale: locale,
                         onEdit: () => _showDepositForm(context, deposit: deposit),
                         onDelete: () => _deleteDeposit(deposit),
-                      ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.1);
+                      ).animate().fadeIn(delay: (40 * index.clamp(0, 8)).ms).slideX(begin: 0.1);
                     },
                   );
                 },
@@ -162,11 +163,6 @@ class _DepositsScreenState extends ConsumerState<DepositsScreen> {
       if (repository != null) {
         try {
           await repository.deleteDeposit(deposit.id);
-
-          // Refresh providers to update UI
-          ref.invalidate(depositsByDateProvider);
-          ref.invalidate(depositsTotalProvider);
-          ref.invalidate(liveCashProvider);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +278,7 @@ class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
   void initState() {
     super.initState();
     if (widget.deposit != null) {
-      _amountController.text = widget.deposit!.amount.toStringAsFixed(0);
+      _amountController.text = AmountInput.format(widget.deposit!.amount);
       _noteController.text = widget.deposit!.note ?? '';
     }
   }
@@ -314,7 +310,7 @@ class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
       final dateStr = formatDateForQuery(selectedDate);
       final deposit = DepositModel(
         id: widget.deposit?.id ?? '',
-        amount: double.parse(_amountController.text),
+        amount: AmountInput.parse(_amountController.text)!,
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         date: widget.deposit?.date ?? dateStr,
         createdBy: currentUser.uid,
@@ -326,11 +322,6 @@ class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
       } else {
         await repository.updateDeposit(deposit);
       }
-
-      // Refresh providers to update UI
-      ref.invalidate(depositsByDateProvider);
-      ref.invalidate(depositsTotalProvider);
-      ref.invalidate(liveCashProvider);
 
       if (mounted) {
         Navigator.pop(context);
@@ -388,7 +379,8 @@ class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
               // Amount
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: AmountInput.keyboardType,
+                inputFormatters: AmountInput.inputFormatters,
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: t('amount_label'),
@@ -396,15 +388,7 @@ class _DepositFormSheetState extends ConsumerState<DepositFormSheet> {
                   prefixText: '৳ ',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return t('amount_required');
-                  }
-                  if (double.tryParse(value) == null) {
-                    return t('amount_invalid');
-                  }
-                  return null;
-                },
+                validator: (value) => AmountInput.validate(value, locale),
               ),
               const SizedBox(height: 16),
 

@@ -25,7 +25,7 @@ class _JoinShopScreenState extends ConsumerState<JoinShopScreen> {
   }
 
   Future<void> _joinShop() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isLoading || !_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;

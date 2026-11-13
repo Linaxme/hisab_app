@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/amount_input.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
@@ -129,7 +130,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                             onDelete: () => _deleteExpense(expense),
                           )
                           .animate()
-                          .fadeIn(delay: (100 * index).ms)
+                          .fadeIn(delay: (40 * index.clamp(0, 8)).ms)
                           .slideX(begin: 0.1);
                     },
                   );
@@ -150,7 +151,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: DateTime.now(),
     );
     if (date != null) {
       ref.read(selectedDateProvider.notifier).state = date;
@@ -204,11 +205,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       if (repository != null) {
         try {
           await repository.deleteExpense(expense.id);
-
-          // Refresh providers to update UI
-          ref.invalidate(expensesByDateProvider);
-          ref.invalidate(expensesTotalsProvider);
-          ref.invalidate(liveCashProvider);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -501,7 +497,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
   void initState() {
     super.initState();
     if (widget.expense != null) {
-      _amountController.text = widget.expense!.amount.toStringAsFixed(0);
+      _amountController.text = AmountInput.format(widget.expense!.amount);
       _noteController.text = widget.expense!.note ?? '';
       _paymentType = widget.expense!.paymentType;
     }
@@ -539,7 +535,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
       final dateStr = formatDateForQuery(selectedDate);
       final expense = ExpenseModel(
         id: widget.expense?.id ?? '',
-        amount: double.parse(_amountController.text),
+        amount: AmountInput.parse(_amountController.text)!,
         categoryId: _selectedCategory!.id,
         categoryName: _selectedCategory!.name,
         subCategoryId: _selectedSubCategory?.id,
@@ -548,7 +544,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
             ? null
             : _noteController.text.trim(),
         paymentType: _paymentType,
-        date: dateStr,
+        date: widget.expense?.date ?? dateStr,
         createdBy: currentUser.uid,
         createdAt: widget.expense?.createdAt ?? DateTime.now(),
       );
@@ -558,11 +554,6 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
       } else {
         await repository.updateExpense(expense);
       }
-
-      // Refresh providers to update UI
-      ref.invalidate(expensesByDateProvider);
-      ref.invalidate(expensesTotalsProvider);
-      ref.invalidate(liveCashProvider);
 
       if (mounted) {
         Navigator.pop(context);
@@ -634,7 +625,8 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
               // Amount
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: AmountInput.keyboardType,
+                inputFormatters: AmountInput.inputFormatters,
                 decoration: InputDecoration(
                   labelText: tr(locale, 'amount'),
                   prefixIcon: const Icon(Icons.attach_money_rounded),
@@ -643,15 +635,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return tr(locale, 'amount_required');
-                  }
-                  if (double.tryParse(value) == null) {
-                    return tr(locale, 'amount_invalid');
-                  }
-                  return null;
-                },
+                validator: (value) => AmountInput.validate(value, locale),
               ),
               const SizedBox(height: 16),
 

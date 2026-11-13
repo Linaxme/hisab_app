@@ -30,7 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isLoading || !_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -77,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final locale = ref.watch(languageProvider);
 
     return AuthScaffold(
-      title: 'স্বাগতম 👋',
+      title: 'স্বাগতম',
       subtitle: 'আপনার দোকানের হিসাবে লগইন করুন',
       children: [
         Form(

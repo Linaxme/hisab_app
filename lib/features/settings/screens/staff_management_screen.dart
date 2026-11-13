@@ -6,9 +6,9 @@ import '../../../data/models/models.dart';
 
 /// Provider to fetch staff members for current shop
 final staffListProvider = StreamProvider<List<UserModel>>((ref) {
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return Stream.value([]);
-  return ref.watch(userRepositoryProvider).watchStaffByShopId(shop.id);
+  final shopId = ref.watch(currentShopIdProvider);
+  if (shopId == null) return Stream.value([]);
+  return ref.watch(userRepositoryProvider).watchStaffByShopId(shopId);
 });
 
 class StaffManagementScreen extends ConsumerWidget {

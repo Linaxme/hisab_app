@@ -15,7 +15,7 @@ String formatQty(double qty) {
   return qty.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
 }
 
-final _decimalInput = [FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,3}'))];
+final _decimalInput = [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}'))];
 
 double? _parse(TextEditingController c) => double.tryParse(c.text.trim());
 
@@ -96,6 +96,11 @@ class _StockProductFormState extends ConsumerState<_StockProductForm> {
     final unit = _unit.isEmpty ? _customUnit.text.trim() : _unit;
     if (name.isEmpty || unit.isEmpty) {
       _snack(context, 'পণ্যের নাম আর একক দিন');
+      return;
+    }
+    final products = ref.read(productsProvider).valueOrNull ?? const <ProductModel>[];
+    if (ProductModel.nameTaken(products, name, exceptId: _existing?.id)) {
+      _snack(context, 'এই নামে পণ্য আগে থেকেই আছে');
       return;
     }
     final repository = ref.read(productsRepositoryProvider);

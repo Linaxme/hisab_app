@@ -91,6 +91,12 @@ class ProductModel {
       lowStockAt: lowStockAt,
     );
   }
+
+  /// Whether another product already uses [name]. Sales find stock by name, so names must be unique.
+  static bool nameTaken(Iterable<ProductModel> products, String name, {String? exceptId}) {
+    final key = name.trim().toLowerCase();
+    return products.any((p) => p.id != exceptId && p.name.trim().toLowerCase() == key);
+  }
 }
 
 /// A stock movement: goods received ('in') or a count correction ('adjust')

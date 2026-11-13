@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/amount_input.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/phone_utils.dart';
 import '../../../core/localization/strings.dart';
@@ -301,10 +302,7 @@ class _CreditScreenState extends ConsumerState<CreditScreen>
           await repository.deleteCreditSale(creditSale.id);
 
           // Refresh providers to update UI
-          ref.invalidate(creditSalesProvider);
-          ref.invalidate(pendingCreditSalesProvider);
           ref.invalidate(creditSummaryProvider);
-          ref.invalidate(liveCashProvider);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -655,7 +653,7 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
     if (widget.creditSale != null) {
       _customerNameController.text = widget.creditSale!.customerName ?? '';
       _customerPhoneController.text = widget.creditSale!.customerPhone ?? '';
-      _amountController.text = widget.creditSale!.amount.toStringAsFixed(0);
+      _amountController.text = AmountInput.format(widget.creditSale!.amount);
     }
   }
 
@@ -671,7 +669,7 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     final collected = widget.creditSale?.collectedAmount ?? 0;
-    if (double.parse(_amountController.text) < collected) {
+    if (AmountInput.parse(_amountController.text)! < collected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('বাকির পরিমাণ আদায়ের চেয়ে কম হতে পারে না')),
       );
@@ -703,7 +701,7 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
         id: widget.creditSale?.id ?? '',
         customerName: customerName.isEmpty ? null : customerName,
         customerPhone: phone,
-        amount: double.parse(_amountController.text),
+        amount: AmountInput.parse(_amountController.text)!,
         collectedAmount: widget.creditSale?.collectedAmount ?? 0,
         date: widget.creditSale?.date ?? dateStr,
         createdBy: currentUser.uid,
@@ -717,8 +715,6 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
       }
 
       // Refresh providers to update UI
-      ref.invalidate(creditSalesProvider);
-      ref.invalidate(pendingCreditSalesProvider);
       ref.invalidate(creditSummaryProvider);
 
       if (mounted) {
@@ -896,7 +892,8 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
               // Amount
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: AmountInput.keyboardType,
+                inputFormatters: AmountInput.inputFormatters,
                 decoration: InputDecoration(
                   labelText: 'পরিমাণ',
                   prefixIcon: const Icon(Icons.attach_money_rounded),
@@ -905,15 +902,8 @@ class _CreditSaleFormSheetState extends ConsumerState<CreditSaleFormSheet> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'পরিমাণ দিন';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'সঠিক পরিমাণ দিন';
-                  }
-                  return null;
-                },
+                validator: (value) => AmountInput.validate(value, ref.read(languageProvider)),
+
               ),
               const SizedBox(height: 24),
 
@@ -990,7 +980,7 @@ class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.parse(_amountController.text);
+    final amount = AmountInput.parse(_amountController.text)!;
     if (amount > widget.creditSale.remainingAmount) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('আদায় বকেয়ার চেয়ে বেশি হতে পারে না')),
@@ -1025,10 +1015,7 @@ class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
       );
 
       // Refresh providers to update UI
-      ref.invalidate(creditSalesProvider);
-      ref.invalidate(pendingCreditSalesProvider);
       ref.invalidate(creditSummaryProvider);
-      ref.invalidate(liveCashProvider);
 
       if (mounted) {
         Navigator.pop(context);
@@ -1087,7 +1074,8 @@ class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
               // Amount
               TextFormField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
+                keyboardType: AmountInput.keyboardType,
+                inputFormatters: AmountInput.inputFormatters,
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: 'আদায় পরিমাণ',
@@ -1098,21 +1086,14 @@ class _CollectionFormSheetState extends ConsumerState<CollectionFormSheet> {
                   ),
                   suffixIcon: TextButton(
                     onPressed: () {
-                      _amountController.text = widget.creditSale.remainingAmount
-                          .toStringAsFixed(0);
+                      _amountController.text =
+                          AmountInput.format(widget.creditSale.remainingAmount);
                     },
                     child: const Text('সব'),
                   ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'পরিমাণ দিন';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'সঠিক পরিমাণ দিন';
-                  }
-                  return null;
-                },
+                validator: (value) => AmountInput.validate(value, ref.read(languageProvider)),
+
               ),
               const SizedBox(height: 24),
 
@@ -1346,7 +1327,6 @@ class _CreditDetailsSheet extends ConsumerWidget {
                                         collection.amount,
                                       );
                                       ref.invalidate(creditSummaryProvider);
-                                      ref.invalidate(liveCashProvider);
                                     } catch (e) {
                                       if (context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(

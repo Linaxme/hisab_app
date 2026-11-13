@@ -21,8 +21,7 @@ final selectedMonthProvider = StateProvider<DateTime>((ref) {
 /// Monthly data provider
 final monthlyDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final selectedMonth = ref.watch(selectedMonthProvider);
-  final shop = ref.watch(currentShopProvider).value;
-  if (shop == null) return {};
+  if (ref.watch(currentShopIdProvider) == null) return {};
 
   final salesRepo = ref.watch(salesRepositoryProvider);
   final expensesRepo = ref.watch(expensesRepositoryProvider);

@@ -91,7 +91,6 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
         saleLabel: tr(locale, 'adjust_sale_name'),
         expenseLabel: tr(locale, 'shortage_expense_name'),
       );
-      if (figures.adjustment != 0) ref.invalidate(liveCashProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(

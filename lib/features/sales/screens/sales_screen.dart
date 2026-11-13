@@ -139,7 +139,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                             onDelete: () => _deleteSale(sale),
                           )
                           .animate()
-                          .fadeIn(delay: (100 * index).ms)
+                          .fadeIn(delay: (40 * index.clamp(0, 8)).ms)
                           .slideX(begin: 0.1);
                     },
                   );
@@ -160,7 +160,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: DateTime.now(),
     );
     if (date != null) {
       ref.read(selectedDateProvider.notifier).state = date;
@@ -220,13 +220,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       if (repository != null) {
         try {
           await repository.deleteSale(sale);
-
-          // Refresh providers to update UI
-          ref.invalidate(salesByDateProvider);
-          ref.invalidate(salesTotalsProvider);
-          ref.invalidate(depositsByDateProvider);
-          ref.invalidate(depositsTotalProvider);
-          ref.invalidate(liveCashProvider);
 
           if (mounted) {
             ScaffoldMessenger.of(
@@ -594,10 +587,6 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
       } else {
         await repository.addSale(sale, autoDeposit: autoDeposit);
       }
-
-      ref.invalidate(salesTotalsProvider);
-      ref.invalidate(depositsTotalProvider);
-      ref.invalidate(liveCashProvider);
 
       if (!mounted) return;
       if (next) {
