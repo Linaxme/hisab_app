@@ -8,6 +8,7 @@ import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
 import '../../../widgets/entry_form.dart';
 import '../../../widgets/modern_widgets.dart';
+import '../expense_groups.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -105,10 +106,20 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                         ? _EmptySearchState(query: _searchQuery, locale: locale)
                         : _EmptyState(locale: locale);
                   }
+                  final groups = groupExpenses(filteredExpenses);
+                  final showBreakdown =
+                      groups.length > 1 || groups.any((g) => g.hasSubcategories);
+                  final offset = showBreakdown ? 1 : 0;
                   return ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                    itemCount: filteredExpenses.length,
+                    itemCount: filteredExpenses.length + offset,
                     itemBuilder: (context, index) {
+                      if (showBreakdown && index == 0) {
+                        return _DayBreakdown(groups: groups, savingsIds: savingsIds)
+                            .animate()
+                            .fadeIn();
+                      }
+                      index -= offset;
                       final expense = filteredExpenses[index];
                       return _ExpenseCard(
                             expense: expense,
@@ -296,6 +307,121 @@ class _EmptySearchState extends StatelessWidget {
           ),
         ],
       ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.9, 0.9)),
+    );
+  }
+}
+
+class _DayBreakdown extends StatefulWidget {
+  final List<CategoryGroup> groups;
+  final Set<String> savingsIds;
+
+  const _DayBreakdown({required this.groups, required this.savingsIds});
+
+  @override
+  State<_DayBreakdown> createState() => _DayBreakdownState();
+}
+
+class _DayBreakdownState extends State<_DayBreakdown> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary = AppTheme.textSecondary;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: AppTheme.cardDecoration(context, radius: 18),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.pie_chart_outline_rounded, color: AppTheme.errorColor, size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('খাত অনুযায়ী মোট', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                  Text(
+                    '${widget.groups.length}টি খাত',
+                    style: TextStyle(fontSize: 12, color: secondary),
+                  ),
+                  Icon(
+                    _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    color: secondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: Column(
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 6),
+                  for (final group in widget.groups) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              group.name,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            CurrencyFormatter.formatNoDecimal(group.total),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: widget.savingsIds.contains(group.key)
+                                  ? AppTheme.successColor
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (group.hasSubcategories)
+                      for (final sub in group.sortedSubs)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 14, bottom: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  sub.name,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: secondary,
+                                    fontStyle: sub.key.isEmpty ? FontStyle.italic : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (sub.items.length > 1)
+                                Text(
+                                  '${sub.items.length}টি  ',
+                                  style: TextStyle(fontSize: 12, color: secondary),
+                                ),
+                              Text(
+                                CurrencyFormatter.formatNoDecimal(sub.total),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

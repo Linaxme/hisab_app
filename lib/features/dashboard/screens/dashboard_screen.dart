@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/providers/dashboard_preferences_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -135,11 +136,8 @@ class _DashboardContent extends ConsumerWidget {
             children: [
               const _DateSelector().animate().fadeIn(delay: 100.ms),
               const SizedBox(height: 16),
+              const _LowStockBanner(),
               _FlowCard(showProfit: showProfit).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05),
-              if (isOwner) ...[
-                const SizedBox(height: 12),
-                const DayCloseCard().animate().fadeIn(delay: 180.ms),
-              ],
               const SizedBox(height: 24),
               SectionHeader(title: tr(locale, 'today_activity')),
               const SizedBox(height: 12),
@@ -170,11 +168,8 @@ class _DashboardContent extends ConsumerWidget {
                   const SizedBox(height: 16),
                   const _DateSelector().animate().fadeIn(delay: 100.ms),
                   const SizedBox(height: 16),
+                  const _LowStockBanner(),
                   _FlowCard(showProfit: showProfit).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05),
-                  if (isOwner) ...[
-                    const SizedBox(height: 16),
-                    const DayCloseCard().animate().fadeIn(delay: 180.ms),
-                  ],
                   const SizedBox(height: 16),
                   const SalesTrendCard().animate().fadeIn(delay: 220.ms),
                 ],
@@ -199,7 +194,57 @@ class _DashboardContent extends ConsumerWidget {
   }
 }
 
-/// Gradient header with greeting, shop and live cash
+/// Shown only while the Stock add-on is on and some product is at or below its alert level.
+class _LowStockBanner extends ConsumerWidget {
+  const _LowStockBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final low = ref.watch(lowStockProductsProvider);
+    if (low.isEmpty) return const SizedBox.shrink();
+    final names = low.take(3).map((p) => p.name).join(', ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: AppTheme.errorColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => context.push('/stock'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: AppTheme.errorColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${low.length}টি পণ্যের স্টক কম',
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.errorColor),
+                      ),
+                      Text(
+                        low.length > 3 ? '$names…' : names,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppTheme.errorColor),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn();
+  }
+}
+
+/// Gradient header: shop identity, greeting, live cash and match-cash.
 class _HeroHeader extends ConsumerWidget {
   final String userName;
   final String shopName;
@@ -218,7 +263,10 @@ class _HeroHeader extends ConsumerWidget {
     final locale = ref.watch(languageProvider);
     final liveCash = ref.watch(dayLiveCashProvider);
     final openingCash = ref.watch(openingCashProvider);
-    final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+    final role = tr(locale, isOwner ? 'owner' : 'staff');
+    final greeting = userName.isEmpty
+        ? tr(locale, 'welcome')
+        : '${tr(locale, 'welcome')} $userName · $role';
 
     return Container(
       decoration: BoxDecoration(
@@ -259,22 +307,15 @@ class _HeroHeader extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          shape: BoxShape.circle,
-                          boxShadow: AppTheme.softShadow(AppTheme.primaryColor),
+                          color: AppTheme.goldColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.goldColor.withValues(alpha: 0.35)),
                         ),
-                        child: Text(
-                          initial,
-                          style: AppTheme.numeric(
-                            color: AppTheme.onPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                        child: const Icon(Icons.storefront_rounded, size: 20, color: AppTheme.goldColor),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -282,25 +323,31 @@ class _HeroHeader extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              tr(locale, 'welcome'),
-                              style: const TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              userName,
+                              shopName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              greeting,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -310,30 +357,6 @@ class _HeroHeader extends ConsumerWidget {
                         child: const SyncIndicator(),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.goldColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.goldColor.withValues(alpha: 0.35)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.storefront_rounded, size: 14, color: AppTheme.goldColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          shopName,
-                          style: const TextStyle(
-                            color: AppTheme.goldColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 22),
                   Row(
@@ -354,11 +377,13 @@ class _HeroHeader extends ConsumerWidget {
                         tr(locale, 'live_cash').toUpperCase(),
                         style: const TextStyle(
                           color: AppTheme.textSecondary,
-                          fontSize: 13,
+                          fontSize: 12,
                           letterSpacing: 1.2,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const Spacer(),
+                      const CashCountCard(),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -375,55 +400,55 @@ class _HeroHeader extends ConsumerWidget {
                         _money(liveCash, (v) => v),
                         style: AppTheme.numeric(
                           color: Colors.white,
-                          fontSize: 46,
+                          fontSize: 42,
                           letterSpacing: -2,
                           height: 1.1,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  InkWell(
-                    onTap: isOwner ? () => showOpeningCashDialog(context, ref) : null,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_rounded,
-                            size: 16,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              isOwner
-                                  ? tr(
-                                      locale,
-                                      'opening_cash_caption',
-                                      params: {'amount': _money(openingCash, (v) => v?.amount ?? 0)},
-                                    )
-                                  : '${tr(locale, 'opening_cash')}: ${_money(openingCash, (v) => v?.amount ?? 0)}',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.85),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: isOwner ? () => showOpeningCashDialog(context, ref) : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 15,
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '${tr(locale, 'opening_cash')} ${_money(openingCash, (v) => v?.amount ?? 0)}',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.75),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                if (isOwner) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    size: 13,
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          if (isOwner) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.edit_rounded,
-                              size: 14,
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
+                      const CashCountStatus(),
+                    ],
                   ),
                 ],
               ),
@@ -938,9 +963,18 @@ void showOpeningCashDialog(BuildContext context, WidgetRef ref) {
         decoration: InputDecoration(
           labelText: tr(locale, 'amount'),
           prefixText: '৳ ',
+          helperText: (openingCash?.followsPreviousDay ?? false) ? tr(locale, 'opening_follows_note') : null,
         ),
       ),
       actions: [
+        if (openingCash != null && !openingCash.followsPreviousDay)
+          TextButton(
+            onPressed: () async {
+              await ref.read(openingCashRepositoryProvider)?.followPreviousDay(openingCash.id);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: Text(tr(locale, 'opening_follow_previous')),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(tr(locale, 'cancel')),
@@ -950,8 +984,11 @@ void showOpeningCashDialog(BuildContext context, WidgetRef ref) {
             final amount = double.tryParse(controller.text) ?? 0;
             final repository = ref.read(openingCashRepositoryProvider);
             final selectedDate = ref.read(selectedDateProvider);
+            final unchanged = openingCash != null &&
+                openingCash.followsPreviousDay &&
+                (openingCash.amount - amount).abs() < 0.5;
 
-            if (repository != null) {
+            if (repository != null && !unchanged) {
               final dateStr = formatDateForQuery(selectedDate);
               final currentUser = ref.read(currentUserProvider).value;
               await repository.setOpeningCash(

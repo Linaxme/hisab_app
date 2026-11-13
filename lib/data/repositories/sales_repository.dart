@@ -17,11 +17,26 @@ class SalesRepository {
   CollectionReference<Map<String, dynamic>> get _depositsCollection =>
       _firestore.collection('shops').doc(shopId).collection('deposits');
 
+  CollectionReference<Map<String, dynamic>> get _productsCollection =>
+      _firestore.collection('shops').doc(shopId).collection('products');
+
+  /// Moves product stock by [change] (positive puts stock back).
+  void _moveStock(WriteBatch batch, Map<String, double> change) {
+    for (final MapEntry(key: productId, value: qty) in change.entries) {
+      if (qty == 0) continue;
+      batch.update(_productsCollection.doc(productId), {
+        'stockQty': FieldValue.increment(qty),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   // Create (with the auto-deposit for a non-cash sale, written atomically)
   Future<String> addSale(SaleModel sale, {DepositModel? autoDeposit}) async {
     final batch = _firestore.batch();
     final saleRef = _salesCollection.doc();
     batch.set(saleRef, sale.toFirestore());
+    _moveStock(batch, {for (final e in sale.stockUse.entries) e.key: -e.value});
     if (autoDeposit != null) {
       batch.set(
         _depositsCollection.doc(),
@@ -138,6 +153,11 @@ class SalesRepository {
     final depositRefs = await _linkedDepositRefs(oldSale);
     final batch = _firestore.batch();
     batch.update(_salesCollection.doc(sale.id), sale.toUpdateFirestore());
+    final stockChange = <String, double>{...oldSale.stockUse};
+    for (final MapEntry(key: productId, value: qty) in sale.stockUse.entries) {
+      stockChange[productId] = (stockChange[productId] ?? 0) - qty;
+    }
+    _moveStock(batch, stockChange);
 
     if (autoDeposit == null) {
       for (final ref in depositRefs) {
@@ -166,6 +186,7 @@ class SalesRepository {
     final depositRefs = await _linkedDepositRefs(sale);
     final batch = _firestore.batch();
     batch.delete(_salesCollection.doc(sale.id));
+    _moveStock(batch, sale.stockUse);
     for (final ref in depositRefs) {
       batch.delete(ref);
     }

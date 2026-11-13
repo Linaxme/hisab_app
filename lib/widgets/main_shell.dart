@@ -6,6 +6,7 @@ import '../core/providers/providers.dart';
 import '../core/theme/app_theme.dart';
 import '../core/update/app_updater.dart';
 import '../core/utils/responsive.dart';
+import '../features/dashboard/day_activity.dart';
 import '../features/entry/new_entry_sheet.dart';
 import 'app_actions.dart';
 import 'app_logo.dart';
@@ -59,7 +60,9 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(inviteCodeSyncProvider);
+    ref.watch(shopDataSyncProvider);
+    ref.watch(openingFollowSyncProvider);
+    ref.watch(carryForwardSyncProvider);
     ref.listen(appUpdateProvider, (_, next) {
       final update = next.valueOrNull;
       if (update != null) maybePromptUpdate(context, update);

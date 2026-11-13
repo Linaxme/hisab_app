@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/models.dart';
@@ -13,14 +14,29 @@ final shopRepositoryProvider = Provider<ShopRepository>((ref) {
   );
 });
 
-/// Keeps the owner's invite code registered in the inviteCodes lookup collection
-final inviteCodeSyncProvider = FutureProvider<void>((ref) async {
+/// The shop's staff accounts, loaded only for the owner.
+final shopStaffProvider = StreamProvider<List<UserModel>>((ref) {
   final user = ref.watch(currentUserProvider).valueOrNull;
   final shop = ref.watch(currentShopProvider).valueOrNull;
   if (user == null || !user.isOwner || shop == null || shop.ownerUid != user.uid) {
-    return;
+    return Stream.value(const []);
   }
-  await ref.read(shopRepositoryProvider).ensureInviteCodeRegistered(shop);
+  return ref.watch(authRepositoryProvider).watchStaffByShopId(shop.id);
+});
+
+/// Keeps the shop's member list, name labels and invite code registration up to date.
+/// Older shops get their `members` filled in the first time they open this version.
+final shopDataSyncProvider = FutureProvider<void>((ref) async {
+  final user = ref.watch(currentUserProvider).valueOrNull;
+  final shop = ref.watch(currentShopProvider).valueOrNull;
+  if (user == null || !user.active || shop == null || user.shopId != shop.id) return;
+  final staff = ref.watch(shopStaffProvider);
+  if (staff.isLoading && !staff.hasValue) return;
+  await ref.read(shopRepositoryProvider).syncShopData(
+        user: user,
+        shop: shop,
+        staff: staff.valueOrNull ?? const [],
+      );
 });
 
 /// Shop Repository class
@@ -49,18 +65,38 @@ class ShopRepository {
     }
   }
 
+  /// Invite code lookup entry; the names are labels so the database shows whose code it is.
+  Map<String, dynamic> _codeData(String shopId, String shopName, String ownerName) => {
+        'shopId': shopId,
+        'shopName': shopName,
+        'ownerName': ownerName,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+  /// Member list and labels are copies; failures are left for [syncShopData] to repair.
+  Future<void> _quietly(Future<void> Function() write) async {
+    try {
+      await write();
+    } on FirebaseException catch (e) {
+      debugPrint('Shop data sync skipped: ${e.code} ${e.message}');
+    }
+  }
+
   /// Create a new shop (Owner only)
   Future<String> createShop({
     required String name,
     required String ownerUid,
   }) async {
     final inviteCode = await _generateUnusedInviteCode();
+    final owner = await authRepository.getUserById(ownerUid);
+    final ownerName = owner?.name ?? '';
     
     final shop = ShopModel(
       id: '',
       name: name,
       inviteCode: inviteCode,
       ownerUid: ownerUid,
+      ownerName: ownerName,
       createdAt: DateTime.now(),
     );
 
@@ -69,10 +105,11 @@ class ShopRepository {
     // Update user with shopId
     await authRepository.updateUserShopId(ownerUid, docRef.id);
 
-    await _inviteCodes.doc(inviteCode).set({
-      'shopId': docRef.id,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    await _inviteCodes.doc(inviteCode).set(_codeData(docRef.id, name, ownerName));
+
+    if (owner != null) {
+      await _quietly(() => authRepository.upsertMember(docRef.id, owner, isNew: true));
+    }
     
     // Create default expense categories
     await _createDefaultCategories(docRef.id);
@@ -95,6 +132,11 @@ class ShopRepository {
     
     // Update user with shopId; the security rules verify the code against inviteCodes
     await authRepository.updateUserShopId(userId, shopId, joinCode: code);
+
+    final staff = await authRepository.getUserById(userId);
+    if (staff != null) {
+      await _quietly(() => authRepository.upsertMember(shopId, staff, isNew: true));
+    }
     
     return shopId;
   }
@@ -104,10 +146,7 @@ class ShopRepository {
     final shop = await getShopById(shopId);
     final newCode = await _generateUnusedInviteCode();
 
-    await _inviteCodes.doc(newCode).set({
-      'shopId': shopId,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    await _inviteCodes.doc(newCode).set(_codeData(shopId, shop?.name ?? '', shop?.ownerName ?? ''));
     
     await firestore.collection('shops').doc(shopId).update({
       'inviteCode': newCode,
@@ -126,20 +165,65 @@ class ShopRepository {
 
   /// Register the shop's current invite code in the lookup collection.
   /// Shops created before the inviteCodes collection existed need this once.
-  Future<void> ensureInviteCodeRegistered(ShopModel shop) async {
+  Future<void> ensureInviteCodeRegistered(ShopModel shop, {String? ownerName}) async {
     if (shop.inviteCode.isEmpty) {
       await regenerateInviteCode(shop.id);
       return;
     }
 
+    final owner = ownerName ?? shop.ownerName;
     final codeDoc = await _inviteCodes.doc(shop.inviteCode).get();
+    final data = codeDoc.data();
     if (!codeDoc.exists) {
-      await _inviteCodes.doc(shop.inviteCode).set({
-        'shopId': shop.id,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } else if (codeDoc.data()?['shopId'] != shop.id) {
+      await _inviteCodes.doc(shop.inviteCode).set(_codeData(shop.id, shop.name, owner));
+    } else if (data?['shopId'] != shop.id) {
       await regenerateInviteCode(shop.id);
+    } else if (data?['shopName'] != shop.name || data?['ownerName'] != owner) {
+      await _quietly(() => codeDoc.reference.update({'shopName': shop.name, 'ownerName': owner}));
+    }
+  }
+
+  /// Fills in and refreshes the shop's member list and name labels, writing only
+  /// what is missing or out of date. The owner also covers staff who never open the app.
+  Future<void> syncShopData({
+    required UserModel user,
+    required ShopModel shop,
+    List<UserModel> staff = const [],
+  }) async {
+    final isShopOwner = user.isOwner && shop.ownerUid == user.uid;
+    final users = firestore.collection('users');
+
+    if (isShopOwner) {
+      await _quietly(() => ensureInviteCodeRegistered(shop, ownerName: user.name));
+      if (shop.ownerName != user.name) {
+        await _quietly(() => firestore.collection('shops').doc(shop.id).update({'ownerName': user.name}));
+      }
+    }
+    if (user.shopName != shop.name) {
+      await _quietly(() => users.doc(user.uid).update({'shopName': shop.name}));
+    }
+
+    await _quietly(() async {
+      final people = [user, if (isShopOwner) ...staff.where((s) => s.shopId == shop.id)];
+      final Map<String, MemberModel> existing;
+      if (isShopOwner) {
+        final snapshot = await firestore.collection('shops').doc(shop.id).collection('members').get();
+        existing = {for (final doc in snapshot.docs) doc.id: MemberModel.fromFirestore(doc)};
+      } else {
+        final doc = await authRepository.memberRef(shop.id, user.uid).get();
+        existing = {if (doc.exists) doc.id: MemberModel.fromFirestore(doc)};
+      }
+
+      final stale = people.where((p) => !(existing[p.uid]?.matches(p) ?? false)).toList();
+      for (final person in stale) {
+        await authRepository.upsertMember(shop.id, person, isNew: !existing.containsKey(person.uid));
+      }
+    });
+
+    if (isShopOwner) {
+      for (final s in staff.where((s) => s.shopId == shop.id && s.shopName != shop.name)) {
+        await _quietly(() => users.doc(s.uid).update({'shopName': shop.name}));
+      }
     }
   }
 
@@ -158,6 +242,10 @@ class ShopRepository {
       'name': name,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    final shop = await getShopById(shopId);
+    if (shop != null && shop.inviteCode.isNotEmpty) {
+      await _quietly(() => _inviteCodes.doc(shop.inviteCode).update({'shopName': name}));
+    }
   }
 
   /// Get shop by ID

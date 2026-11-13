@@ -18,6 +18,9 @@ import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/products_settings_screen.dart';
 import '../../features/more/screens/more_screen.dart';
 import '../../features/legal/privacy_policy_screen.dart';
+import '../../features/premium/screens/admin_screen.dart';
+import '../../features/premium/screens/premium_screen.dart';
+import '../../features/stock/screens/stock_screen.dart';
 import '../../widgets/main_shell.dart';
 
 /// Auth state notifier for GoRouter refresh
@@ -186,6 +189,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/more',
             pageBuilder: (context, state) => const NoTransitionPage(child: MoreScreen()),
+          ),
+          GoRoute(
+            path: '/stock',
+            pageBuilder: (context, state) => const NoTransitionPage(child: StockScreen()),
+          ),
+          GoRoute(
+            path: '/premium',
+            pageBuilder: (context, state) => const NoTransitionPage(child: PremiumScreen()),
+          ),
+          GoRoute(
+            path: '/admin',
+            pageBuilder: (context, state) => const NoTransitionPage(child: AdminScreen()),
           ),
         ],
       ),

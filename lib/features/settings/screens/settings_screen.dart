@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/providers/providers.dart';
@@ -53,46 +54,21 @@ class SettingsScreen extends ConsumerWidget {
                         icon: Icons.key,
                         title: 'Invite Code',
                         subtitle: shop.inviteCode,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Regenerate Invite Code'),
-                                content: const Text(
-                                  'This will create a new invite code. Staff with the old code won\'t be able to join.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () => Navigator.pop(context, true),
-                                    child: const Text('Regenerate'),
-                                  ),
-                                ],
-                              ),
-                            );
-
-                            if (confirm == true) {
-                              try {
-                                await ref.read(shopRepositoryProvider).regenerateInviteCode(shop.id);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Invite code regenerated')),
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Failed to regenerate invite code: $e')),
-                                  );
-                                }
-                              }
-                            }
-                          },
+                        onTap: () => _copyInviteCode(context, shop.inviteCode),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'কোড কপি করুন',
+                              icon: const Icon(Icons.copy_rounded),
+                              onPressed: () => _copyInviteCode(context, shop.inviteCode),
+                            ),
+                            IconButton(
+                              tooltip: 'নতুন কোড',
+                              icon: const Icon(Icons.refresh),
+                              onPressed: () => _regenerateInviteCode(context, ref, shop.id),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -290,22 +266,70 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+Future<void> _regenerateInviteCode(BuildContext context, WidgetRef ref, String shopId) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Regenerate Invite Code'),
+      content: const Text(
+        'This will create a new invite code. Staff with the old code won\'t be able to join.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Regenerate'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm != true) return;
+  try {
+    await ref.read(shopRepositoryProvider).regenerateInviteCode(shopId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invite code regenerated')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to regenerate invite code: $e')),
+      );
+    }
+  }
+}
+
+void _copyInviteCode(BuildContext context, String code) {
+  if (code.isEmpty) return;
+  Clipboard.setData(ClipboardData(text: code));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('ইনভাইট কোড $code কপি হয়েছে')),
+  );
+}
+
 class _SettingRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   const _SettingRow({
     required this.icon,
     required this.title,
     required this.subtitle,
     this.trailing,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final row = Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
@@ -341,6 +365,8 @@ class _SettingRow extends StatelessWidget {
         if (trailing != null) trailing!,
       ],
     );
+    if (onTap == null) return row;
+    return InkWell(borderRadius: BorderRadius.circular(8), onTap: onTap, child: row);
   }
 }
 

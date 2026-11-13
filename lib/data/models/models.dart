@@ -24,3 +24,6 @@ export 'return_model.dart';
 
 // Opening Cash Model
 export 'opening_cash_model.dart';
+
+// Premium add-ons
+export 'premium_model.dart';

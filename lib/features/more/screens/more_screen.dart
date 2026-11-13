@@ -8,6 +8,7 @@ import '../../../core/localization/strings.dart';
 import '../../../core/update/app_updater.dart';
 import '../../../widgets/app_actions.dart';
 import '../../../widgets/app_logo.dart';
+import '../../export/export_actions.dart';
 import '../../../widgets/modern_widgets.dart';
 import '../../../widgets/update_dialog.dart';
 
@@ -23,6 +24,8 @@ class MoreScreen extends ConsumerWidget {
     final locale = ref.watch(languageProvider);
     String t(String key) => tr(locale, key);
     final version = ref.watch(appVersionProvider).valueOrNull;
+    final stockActive = ref.watch(stockAddonActiveProvider);
+    final isSuperAdmin = ref.watch(isSuperAdminProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -66,6 +69,13 @@ class MoreScreen extends ConsumerWidget {
                   subtitle: t('menu_returns_sub'),
                   onTap: () => context.push('/returns'),
                 ),
+                _MenuItem(
+                  icon: Icons.inventory_rounded,
+                  color: AppTheme.successColor,
+                  title: 'স্টক',
+                  subtitle: stockActive ? 'পণ্যের স্টক, মাল আসা ও কম স্টক' : 'প্রিমিয়াম অ্যাড-অন',
+                  onTap: () => context.push('/stock'),
+                ),
               ],
             ).animate().fadeIn(delay: 80.ms),
 
@@ -83,6 +93,13 @@ class MoreScreen extends ConsumerWidget {
                     onTap: () => context.push('/monthly-summary'),
                   ),
                   _MenuItem(
+                    icon: Icons.table_view_rounded,
+                    color: AppTheme.successColor,
+                    title: t('export_excel'),
+                    subtitle: t('export_excel_sub'),
+                    onTap: () => pickRangeAndExportExcel(context, ref),
+                  ),
+                  _MenuItem(
                     icon: Icons.inventory_2_rounded,
                     color: AppTheme.warningColor,
                     title: t('nav_products'),
@@ -96,6 +113,21 @@ class MoreScreen extends ConsumerWidget {
                     subtitle: t('menu_settings_sub'),
                     onTap: () => context.push('/settings'),
                   ),
+                  _MenuItem(
+                    icon: Icons.workspace_premium_rounded,
+                    color: AppTheme.accentColor,
+                    title: 'প্রিমিয়াম',
+                    subtitle: 'অ্যাড-অনের মেয়াদ ও পেমেন্ট',
+                    onTap: () => context.push('/premium'),
+                  ),
+                  if (isSuperAdmin)
+                    _MenuItem(
+                      icon: Icons.admin_panel_settings_rounded,
+                      color: AppTheme.errorColor,
+                      title: 'অ্যাডমিন',
+                      subtitle: 'পেমেন্ট যাচাই ও দাম ঠিক করা',
+                      onTap: () => context.push('/admin'),
+                    ),
                 ],
               ).animate().fadeIn(delay: 140.ms),
             ],

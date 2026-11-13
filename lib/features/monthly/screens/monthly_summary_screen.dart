@@ -7,6 +7,8 @@ import '../../../core/localization/strings.dart';
 import '../../../data/models/models.dart';
 import '../../../widgets/donut_chart.dart';
 import '../../../widgets/entry_form.dart' show SheetHandle;
+import '../../expenses/expense_groups.dart';
+import '../../export/export_actions.dart';
 import '../../reports/report_share_sheet.dart';
 import '../../../widgets/widgets.dart';
 
@@ -147,6 +149,18 @@ class MonthlySummaryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(tr(locale, 'monthly_summary_title')),
         actions: [
+          if (monthlyData.valueOrNull?.isNotEmpty ?? false)
+            IconButton(
+              tooltip: tr(locale, 'export_excel'),
+              icon: const Icon(Icons.table_view_rounded),
+              onPressed: () => exportExcel(
+                context,
+                ref,
+                start: selectedMonth,
+                end: DateTime(selectedMonth.year, selectedMonth.month + 1, 0),
+                period: _formatMonth(selectedMonth),
+              ),
+            ),
           if (monthlyData.valueOrNull?.isNotEmpty ?? false)
             IconButton(
               tooltip: tr(locale, 'share_report'),
@@ -561,31 +575,6 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _ExpenseGroup {
-  final String name;
-  double total = 0;
-  final List<ExpenseModel> items = [];
-
-  _ExpenseGroup(this.name);
-
-  void add(ExpenseModel expense) {
-    total += expense.amount;
-    items.add(expense);
-  }
-}
-
-class _CategoryGroup extends _ExpenseGroup {
-  /// Keyed by subcategory; '' holds expenses without a subcategory.
-  final Map<String, _ExpenseGroup> subs = {};
-
-  _CategoryGroup(super.name);
-
-  bool get hasSubcategories => subs.keys.any((k) => k.isNotEmpty);
-
-  List<_ExpenseGroup> get sortedSubs =>
-      subs.values.toList()..sort((a, b) => b.total.compareTo(a.total));
-}
-
 class _ExpenseBreakdownCard extends StatefulWidget {
   final List<ExpenseModel> expenses;
 
@@ -598,35 +587,18 @@ class _ExpenseBreakdownCard extends StatefulWidget {
 class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
   final Set<String> _expanded = {};
 
-  static const _noSubcategory = 'সাব-ক্যাটাগরি ছাড়া';
-
-  List<(String, _CategoryGroup)> _group() {
-    final groups = <String, _CategoryGroup>{};
-    for (final e in widget.expenses) {
-      final key = e.categoryId.isEmpty ? e.categoryName : e.categoryId;
-      final group = groups.putIfAbsent(key, () => _CategoryGroup(e.categoryName))..add(e);
-      final subName = e.subCategoryName?.trim() ?? '';
-      final subKey = subName.isEmpty ? '' : (e.subCategoryId ?? subName);
-      group.subs
-          .putIfAbsent(subKey, () => _ExpenseGroup(subKey.isEmpty ? _noSubcategory : subName))
-          .add(e);
-    }
-    return groups.entries.map((e) => (e.key, e.value)).toList()
-      ..sort((a, b) => b.$2.total.compareTo(a.$2.total));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final sorted = _group();
-    final total = sorted.fold<double>(0, (sum, e) => sum + e.$2.total);
+    final sorted = groupExpenses(widget.expenses);
+    final total = sorted.fold<double>(0, (sum, g) => sum + g.total);
     final maxSlices = chartPalette.length;
     Color colorAt(int i) => i < maxSlices - 1 ? chartPalette[i] : chartPalette.last;
     final slices = <(String, double, Color)>[
-      for (final (i, e) in sorted.take(maxSlices - 1).indexed) (e.$2.name, e.$2.total, chartPalette[i]),
+      for (final (i, g) in sorted.take(maxSlices - 1).indexed) (g.name, g.total, chartPalette[i]),
       if (sorted.length >= maxSlices)
         (
           'অন্যান্য',
-          sorted.skip(maxSlices - 1).fold<double>(0, (sum, e) => sum + e.$2.total),
+          sorted.skip(maxSlices - 1).fold<double>(0, (sum, g) => sum + g.total),
           chartPalette.last,
         ),
     ];
@@ -650,11 +622,11 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
 
     final legend = Column(
       children: [
-        for (final (i, (key, group)) in sorted.indexed) ...[
+        for (final (i, group) in sorted.indexed) ...[
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () => group.hasSubcategories
-                ? setState(() => _expanded.contains(key) ? _expanded.remove(key) : _expanded.add(key))
+                ? setState(() => _expanded.remove(group.key) || _expanded.add(group.key))
                 : _showExpenseList(context, group.name, group),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
@@ -685,7 +657,7 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
                   const SizedBox(width: 4),
                   Icon(
                     group.hasSubcategories
-                        ? (_expanded.contains(key) ? Icons.expand_less_rounded : Icons.expand_more_rounded)
+                        ? (_expanded.contains(group.key) ? Icons.expand_less_rounded : Icons.expand_more_rounded)
                         : Icons.chevron_right_rounded,
                     size: 18,
                     color: AppTheme.textSecondary,
@@ -694,7 +666,7 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
               ),
             ),
           ),
-          if (_expanded.contains(key))
+          if (_expanded.contains(group.key))
             Container(
               margin: const EdgeInsets.only(left: 4, bottom: 6),
               padding: const EdgeInsets.only(left: 12),
@@ -716,7 +688,7 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
                                 sub.name,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontStyle: identical(sub.name, _noSubcategory) ? FontStyle.italic : null,
+                                  fontStyle: sub.key.isEmpty ? FontStyle.italic : null,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -803,7 +775,7 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
     );
   }
 
-  void _showExpenseList(BuildContext context, String title, _ExpenseGroup group) {
+  void _showExpenseList(BuildContext context, String title, ExpenseGroup group) {
     final items = [...group.items]..sort((a, b) {
         final byDate = b.date.compareTo(a.date);
         return byDate != 0 ? byDate : b.createdAt.compareTo(a.createdAt);
@@ -844,7 +816,7 @@ class _ExpenseBreakdownCardState extends State<_ExpenseBreakdownCard> {
                     itemBuilder: (context, index) {
                       final e = items[index];
                       final details = [
-                        if (group is _CategoryGroup && (e.subCategoryName ?? '').isNotEmpty) e.subCategoryName!,
+                        if (group is CategoryGroup && (e.subCategoryName ?? '').isNotEmpty) e.subCategoryName!,
                         if ((e.note ?? '').isNotEmpty) e.note!,
                         if (!e.isCash) 'ক্যাশের বাইরে',
                       ].join(' · ');

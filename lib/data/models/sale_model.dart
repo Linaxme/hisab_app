@@ -16,6 +16,10 @@ class SaleModel {
   /// Excess cash found at day close, booked as a forgotten sale.
   final bool isAdjustment;
 
+  /// Stocked product sold and how much of it; stock moves by [quantity]
+  final String? productId;
+  final double? quantity;
+
   SaleModel({
     required this.id,
     required this.productName,
@@ -27,7 +31,13 @@ class SaleModel {
     required this.createdAt,
     this.updatedAt,
     this.isAdjustment = false,
+    this.productId,
+    this.quantity,
   });
+
+  /// Stock this sale takes out, keyed by product
+  Map<String, double> get stockUse =>
+      productId != null && (quantity ?? 0) > 0 ? {productId!: quantity!} : const {};
 
   factory SaleModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -44,6 +54,8 @@ class SaleModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       isAdjustment: data['isAdjustment'] == true,
+      productId: data['productId'],
+      quantity: (data['quantity'] as num?)?.toDouble(),
     );
   }
 
@@ -58,6 +70,8 @@ class SaleModel {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       if (isAdjustment) 'isAdjustment': true,
+      if (stockUse.isNotEmpty) 'productId': productId,
+      if (stockUse.isNotEmpty) 'quantity': quantity,
     };
   }
 
@@ -68,6 +82,8 @@ class SaleModel {
       'profit': profit,
       'paymentType': paymentType == PaymentType.cash ? 'cash' : 'noncash',
       'date': date,
+      'productId': stockUse.isEmpty ? null : productId,
+      'quantity': stockUse.isEmpty ? null : quantity,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -94,6 +110,8 @@ class SaleModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isAdjustment: isAdjustment,
+      productId: productId,
+      quantity: quantity,
     );
   }
 

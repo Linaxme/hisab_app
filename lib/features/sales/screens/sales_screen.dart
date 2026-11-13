@@ -10,6 +10,7 @@ import '../../../data/models/models.dart';
 import '../../../widgets/amount_keypad.dart';
 import '../../../widgets/entry_form.dart';
 import '../../../widgets/modern_widgets.dart';
+import '../../stock/stock_forms.dart' show formatQty;
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -409,6 +410,7 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
   bool _isLoading = false;
   bool _showError = false;
   int _savedCount = 0;
+  double _qty = 1;
 
   bool get _isEdit => widget.sale != null;
 
@@ -423,7 +425,66 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
       _profit = _digits(sale.profit);
       _paymentType = sale.paymentType;
       _selectedProduct = sale.productName.isNotEmpty ? sale.productName : null;
+      _qty = sale.quantity ?? 1;
     }
+  }
+
+  /// The stocked product behind the selected chip, while the Stock add-on is on.
+  ProductModel? get _stockProduct {
+    if (_typingProduct || _selectedProduct == null || !ref.read(stockAddonActiveProvider)) return null;
+    final tracked = ref.read(stockProductsProvider);
+    final originalId = widget.sale?.productId;
+    if (originalId != null && widget.sale!.productName == _selectedProduct) {
+      final byId = tracked.where((p) => p.id == originalId).firstOrNull;
+      if (byId != null) return byId;
+    }
+    return tracked.where((p) => p.name == _selectedProduct).firstOrNull;
+  }
+
+  /// Price and profit follow quantity × the product's prices when those are set.
+  void _applyStockPrices() {
+    final product = _stockProduct;
+    if (product == null || product.sellPrice == null) return;
+    final sell = product.sellPrice! * _qty;
+    _price = _digits(sell.roundToDouble());
+    _profit = product.buyPrice == null ? _profit : _digits((sell - product.buyPrice! * _qty).roundToDouble());
+    _showError = false;
+  }
+
+  void _setQty(double qty) {
+    if (qty <= 0) return;
+    setState(() {
+      _qty = qty;
+      _applyStockPrices();
+    });
+  }
+
+  Future<void> _editQty(ProductModel product) async {
+    final controller = TextEditingController(text: formatQty(_qty));
+    final qty = await showDialog<double>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('পরিমাণ'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}'))],
+          decoration: InputDecoration(suffixText: product.unit),
+          onSubmitted: (v) => Navigator.pop(context, double.tryParse(v.trim())),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('বাতিল')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, double.tryParse(controller.text.trim())),
+            child: const Text('ঠিক আছে'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (qty != null) _setQty(qty);
+    _keyboardFocus.requestFocus();
   }
 
   @override
@@ -499,6 +560,9 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
       }
 
       final dateStr = widget.sale?.date ?? formatDateForQuery(selectedDate);
+      final stockProduct = _stockProduct;
+      // With the add-on off, an edit keeps the sale's old stock link untouched.
+      final keepOld = stockProduct == null && !ref.read(stockAddonActiveProvider);
       final sale = SaleModel(
         id: widget.sale?.id ?? '',
         productName: _productName,
@@ -508,6 +572,8 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
         date: dateStr,
         createdBy: currentUser.uid,
         createdAt: widget.sale?.createdAt ?? DateTime.now(),
+        productId: stockProduct?.id ?? (keepOld ? widget.sale?.productId : null),
+        quantity: stockProduct != null ? _qty : (keepOld ? widget.sale?.quantity : null),
       );
 
       // A digital sale is mirrored by an auto-created deposit
@@ -541,6 +607,7 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
           _active = _AmountField.price;
           _selectedProduct = null;
           _typingProduct = false;
+          _qty = 1;
           _productController.clear();
           _savedCount++;
         });
@@ -581,6 +648,9 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
     final digital = _paymentType == PaymentType.noncash;
     final accent = digital ? AppTheme.infoColor : AppTheme.successColor;
     final chips = _productChips();
+    ref.watch(stockProductsProvider);
+    ref.watch(stockAddonActiveProvider);
+    final stockProduct = _stockProduct;
 
     return Focus(
       focusNode: _keyboardFocus,
@@ -655,11 +725,22 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
                           onTap: () => setState(() {
                             _typingProduct = false;
                             _selectedProduct = _selectedProduct == name ? null : name;
+                            _qty = 1;
+                            _applyStockPrices();
                           }),
                         ),
                     ],
                   ),
                 ),
+                if (stockProduct != null) ...[
+                  const SizedBox(height: 10),
+                  _QuantityRow(
+                    product: stockProduct,
+                    qty: _qty,
+                    onChanged: _setQty,
+                    onEdit: () => _editQty(stockProduct),
+                  ),
+                ],
                 if (_typingProduct) ...[
                   const SizedBox(height: 10),
                   TextField(
@@ -756,6 +837,72 @@ class _SaleFormSheetState extends ConsumerState<SaleFormSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// − qty + for a stocked product; tapping the number allows decimals (e.g. 2.5 kg).
+class _QuantityRow extends StatelessWidget {
+  final ProductModel product;
+  final double qty;
+  final ValueChanged<double> onChanged;
+  final VoidCallback onEdit;
+
+  const _QuantityRow({
+    required this.product,
+    required this.qty,
+    required this.onChanged,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final low = product.isLowStock;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('পরিমাণ', style: TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  'স্টকে ${formatQty(product.stockQty)} ${product.unit}'
+                  '${product.sellPrice != null ? ' · ৳${formatQty(product.sellPrice!)}/${product.unit}' : ''}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: low ? AppTheme.errorColor : AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filledTonal(
+            onPressed: qty > 1 ? () => onChanged(qty - 1) : null,
+            icon: const Icon(Icons.remove_rounded),
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onEdit,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                '${formatQty(qty)} ${product.unit}',
+                style: AppTheme.numeric(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          IconButton.filledTonal(
+            onPressed: () => onChanged(qty + 1),
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
       ),
     );
   }

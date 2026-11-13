@@ -6,6 +6,7 @@ class ShopModel {
   final String name;
   final String inviteCode;
   final String ownerUid;
+  final String ownerName;
   final bool showProfit;
   final DateTime createdAt;
 
@@ -14,6 +15,7 @@ class ShopModel {
     required this.name,
     required this.inviteCode,
     required this.ownerUid,
+    this.ownerName = '',
     this.showProfit = true,
     required this.createdAt,
   });
@@ -25,6 +27,7 @@ class ShopModel {
       name: data['name'] ?? '',
       inviteCode: data['inviteCode'] ?? '',
       ownerUid: data['ownerUid'] ?? '',
+      ownerName: data['ownerName'] ?? '',
       showProfit: data['showProfit'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -35,6 +38,7 @@ class ShopModel {
       'name': name,
       'inviteCode': inviteCode,
       'ownerUid': ownerUid,
+      if (ownerName.isNotEmpty) 'ownerName': ownerName,
       'showProfit': showProfit,
       'createdAt': FieldValue.serverTimestamp(),
     };
@@ -53,6 +57,7 @@ class ShopModel {
       name: name ?? this.name,
       inviteCode: inviteCode ?? this.inviteCode,
       ownerUid: ownerUid ?? this.ownerUid,
+      ownerName: ownerName,
       showProfit: showProfit ?? this.showProfit,
       createdAt: createdAt ?? this.createdAt,
     );

@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/contact_launcher.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../data/models/models.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/app_panel.dart';
 import '../dashboard/day_activity.dart';
@@ -73,7 +74,25 @@ ReportData buildDailyReport(WidgetRef ref, {required bool showProfit}) {
   final profit = entries.where((e) => e.kind == ActivityKind.sale).fold<double>(0, (s, e) => s + e.profit);
 
   final closingLines = <ReportLine>[];
-  if (opening != null && opening.isClosed) {
+  final counts = ref.read(cashChecksProvider).valueOrNull ?? const <CashCheckModel>[];
+  final lastCount = counts.firstOrNull;
+  if (lastCount != null) {
+    final (diffText, diffColor) = closingDiffLabel(locale, lastCount.difference);
+    final excess = counts.where((c) => c.adjustment > 0).fold<double>(0, (s, c) => s + c.adjustment);
+    final shortage = counts.where((c) => c.adjustment < 0).fold<double>(0, (s, c) => s - c.adjustment);
+    closingLines
+      ..add(ReportLine(
+        tr(locale, 'report_last_count', params: {'time': DateFormatter.formatTime(lastCount.createdAt)}),
+        money(lastCount.counted),
+      ))
+      ..add(ReportLine(t('cash_check_title'), diffText, color: diffColor));
+    if (excess > 0) {
+      closingLines.add(ReportLine(t('report_adjustment'), money(excess), color: AppTheme.warningColor));
+    }
+    if (shortage > 0) {
+      closingLines.add(ReportLine(t('shortage_expense_name'), money(shortage), color: AppTheme.errorColor));
+    }
+  } else if (opening != null && opening.isClosed) {
     final (diffText, diffColor) = closingDiffLabel(locale, opening.closingDifference);
     closingLines
       ..add(ReportLine(t('counted_cash'), money(opening.closingCounted!)))

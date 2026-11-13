@@ -51,6 +51,45 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
     
+    // App admin who approves premium payments
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.uid in ['NzYKmwMzBHg6k5YU6owjTDbnXVd2'];
+    }
+    
+    // ============================================
+    // PREMIUM (paid add-ons; only the app admin grants them)
+    // ============================================
+    match /shopPremium/{shopId} {
+      allow read: if belongsToShop(shopId) || isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+    
+    match /premiumRequests/{requestId} {
+      allow read: if isSuperAdmin() ||
+        (isAuthenticated() && resource.data.uid == request.auth.uid);
+      
+      // An owner submits a bKash payment for their own shop; it starts as pending
+      allow create: if isActiveOwner(request.resource.data.shopId) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.addon == 'stock' &&
+        request.resource.data.months in [1, 12] &&
+        request.resource.data.amount is number &&
+        request.resource.data.trxId is string &&
+        request.resource.data.trxId.size() >= 6 &&
+        request.resource.data.trxId.size() <= 30 &&
+        request.resource.data.keys().hasOnly(['shopId', 'shopName', 'uid', 'userName', 'email',
+          'addon', 'months', 'amount', 'trxId', 'senderNumber', 'status', 'createdAt']);
+      
+      allow update: if isSuperAdmin();
+      allow delete: if false;
+    }
+    
+    match /appConfig/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
     // ============================================
     // USERS COLLECTION
     // ============================================
@@ -74,7 +113,7 @@ service cloud.firestore {
       // Owner can update staff active status
       allow update: if isAuthenticated() && (
         (request.auth.uid == userId && (
-          changedKeys().hasOnly(['name', 'updatedAt']) ||
+          changedKeys().hasOnly(['name', 'shopName', 'updatedAt']) ||
           (resource.data.get('shopId', null) == null &&
            resource.data.role == 'owner' &&
            changedKeys().hasOnly(['shopId', 'updatedAt']) &&
@@ -86,7 +125,7 @@ service cloud.firestore {
         )) ||
         (resource.data.role == 'staff' &&
          isActiveOwner(resource.data.shopId) &&
-         changedKeys().hasOnly(['active', 'updatedAt'])) ||
+         changedKeys().hasOnly(['active', 'shopName', 'updatedAt'])) ||
         // Owner deleting their shop detaches its staff
         (resource.data.role == 'staff' &&
          isActiveOwner(resource.data.shopId) &&
@@ -107,7 +146,9 @@ service cloud.firestore {
       allow list: if false;
       allow create: if isShopCreator(request.resource.data.shopId);
       allow delete: if isShopCreator(resource.data.shopId);
-      allow update: if false;
+      // Only the shop/owner name labels can change
+      allow update: if isShopCreator(resource.data.shopId) &&
+        changedKeys().hasOnly(['shopName', 'ownerName']);
     }
     
     // ============================================
@@ -142,6 +183,17 @@ service cloud.firestore {
         
         // Only owner can create/update/delete
         allow create, update, delete: if isActiveOwner(shopId);
+        
+        // An opening that follows the previous day's end cash is kept in step
+        // by whoever is using the app; a hand-set one only by the owner
+        allow create: if canAccessShop(shopId) &&
+          request.resource.data.get('carriedFrom', null) is string &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.keys().hasOnly(['amount', 'carriedFrom', 'createdBy', 'createdAt', 'updatedAt']);
+        allow update: if canAccessShop(shopId) &&
+          resource.data.get('carriedFrom', null) != null &&
+          request.resource.data.get('carriedFrom', null) is string &&
+          changedKeys().hasOnly(['amount', 'carriedFrom', 'updatedAt']);
       }
       
       // ============================================
@@ -324,6 +376,46 @@ service cloud.firestore {
         
         // Anyone in shop can delete (soft delete with active flag)
         allow delete: if canAccessShop(shopId);
+      }
+      
+      // ============================================
+      // CASH CHECKS (drawer counts during the day)
+      // ============================================
+      match /cashChecks/{checkId} {
+        allow read: if canAccessShop(shopId);
+        allow create: if canAccessShop(shopId) &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if false;
+        allow delete: if isActiveOwner(shopId);
+      }
+      
+      // ============================================
+      // MEMBERS (owner and staff of this shop; a copy of their users document)
+      // ============================================
+      match /members/{memberUid} {
+        allow read: if canAccessShop(shopId) || isSuperAdmin();
+        
+        // A member may write their own entry, but role and active must match their users document
+        allow create, update: if isActiveOwner(shopId) || (
+          request.auth.uid == memberUid &&
+          belongsToShop(shopId) &&
+          request.resource.data.uid == memberUid &&
+          request.resource.data.role == getUserData().role &&
+          request.resource.data.active == getUserData().active
+        );
+        
+        allow delete: if isActiveOwner(shopId) ||
+          (isAuthenticated() && request.auth.uid == memberUid);
+      }
+      
+      // ============================================
+      // STOCK ENTRIES (goods received / stock counts)
+      // ============================================
+      match /stockEntries/{entryId} {
+        allow read: if canAccessShop(shopId);
+        allow create: if canAccessShop(shopId) &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update, delete: if isActiveOwner(shopId);
       }
     }
   }

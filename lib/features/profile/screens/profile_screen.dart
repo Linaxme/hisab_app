@@ -45,7 +45,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final authRepository = ref.read(authRepositoryProvider);
       final user = authRepository.currentUser;
       if (user != null) {
-        await authRepository.updateUserName(user.uid, name);
+        await authRepository.updateUserName(
+          user.uid,
+          name,
+          shopId: ref.read(currentUserProvider).valueOrNull?.shopId,
+        );
         ref.invalidate(currentUserProvider);
       }
       if (mounted) {

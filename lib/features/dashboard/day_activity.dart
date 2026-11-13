@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/providers.dart';
 
@@ -191,4 +192,92 @@ final dayLiveCashProvider = Provider.autoDispose<AsyncValue<double>>((ref) {
     return flow.hasError ? AsyncError(flow.error!, flow.stackTrace!) : const AsyncLoading();
   }
   return AsyncData((opening.value?.amount ?? 0) + flow.value!.net);
+});
+
+/// A day's own net cash flow read once from the database, for days other than
+/// the selected one (whose entries the dashboard streams already hold).
+Future<double> fetchDayNet(Ref ref, String date) async {
+  final sales = ref.read(salesRepositoryProvider);
+  final expenses = ref.read(expensesRepositoryProvider);
+  final deposits = ref.read(depositsRepositoryProvider);
+  final returns = ref.read(returnsRepositoryProvider);
+  final credit = ref.read(creditRepositoryProvider);
+  if (sales == null || expenses == null || deposits == null || returns == null || credit == null) {
+    return 0;
+  }
+  final (daySales, dayExpenses, dayDeposits, dayReturns, collected) = await (
+    sales.getSalesByDate(date),
+    expenses.getExpensesByDate(date),
+    deposits.getDepositsByDate(date),
+    returns.getReturnsByDate(date),
+    credit.getCollectionsByDate(date),
+  ).wait;
+  double sum<T>(Iterable<T> items, double Function(T) amount) =>
+      items.fold(0.0, (total, item) => total + amount(item));
+  return sum(daySales.where((s) => s.isCash), (s) => s.sellPrice) +
+      collected -
+      sum(dayExpenses.where((e) => e.isCash), (e) => e.amount) -
+      sum(dayDeposits.where((d) => !d.isAutoCreated), (d) => d.amount) -
+      sum(dayReturns.where((r) => r.isCash), (r) => r.amount);
+}
+
+/// Unless set by hand, the selected day's opening is the end cash of the
+/// latest earlier day that has one; this keeps it so.
+final openingFollowSyncProvider = FutureProvider.autoDispose<void>((ref) async {
+  final repository = ref.watch(openingCashRepositoryProvider);
+  final date = formatDateForQuery(ref.watch(selectedDateProvider));
+  final opening = ref.watch(openingCashProvider);
+  final uid = ref.watch(currentUserProvider.select((u) => u.valueOrNull?.uid));
+  final hasEntries = ref.watch(dayActivityProvider.select((a) => a.valueOrNull?.isNotEmpty ?? false));
+  if (repository == null || uid == null || !opening.hasValue) return;
+  final day = opening.value;
+  if (day != null && !day.followsPreviousDay) return;
+
+  var superseded = false;
+  ref.onDispose(() => superseded = true);
+  try {
+    final previous = await repository.getLatestBefore(date);
+    if (superseded) return;
+    final target = previous == null ? 0.0 : previous.endCash(await fetchDayNet(ref, previous.id));
+    final from = previous?.id ?? '';
+    if (superseded) return;
+    // An empty day without cash brought in needs no document of its own.
+    if (day == null && target.abs() < 0.5 && !hasEntries) return;
+    if (day != null && (day.amount - target).abs() < 0.5 && day.carriedFrom == from) return;
+    await repository.setCarriedOpening(date, amount: target, fromDate: from, exists: day != null, createdBy: uid);
+  } catch (e) {
+    debugPrint('Opening sync skipped: $e');
+  }
+});
+
+/// Carries the selected day's end cash into the following days whose
+/// opening follows the previous day, as entries on it change.
+final carryForwardSyncProvider = FutureProvider.autoDispose<void>((ref) async {
+  final repository = ref.watch(openingCashRepositoryProvider);
+  final day = ref.watch(openingCashProvider).valueOrNull;
+  final flow = ref.watch(dayFlowProvider).valueOrNull;
+  final uid = ref.watch(currentUserProvider.select((u) => u.valueOrNull?.uid));
+  if (repository == null || uid == null || day == null || flow == null) return;
+
+  // A count updates its sale or expense and the day's other entries in
+  // separate snapshots; wait for them to settle before writing.
+  var superseded = false;
+  ref.onDispose(() => superseded = true);
+  await Future<void>.delayed(const Duration(milliseconds: 800));
+  if (superseded) return;
+
+  try {
+    var fromDate = day.id;
+    var end = day.endCash(flow.net);
+    for (final next in await repository.getOpeningsAfter(day.id)) {
+      if (superseded || !next.followsPreviousDay) return;
+      if ((next.amount - end).abs() < 0.5 && next.carriedFrom == fromDate) return;
+      await repository.setCarriedOpening(next.id, amount: end, fromDate: fromDate, exists: true, createdBy: uid);
+      if (superseded) return;
+      end = next.copyWith(amount: end).endCash(await fetchDayNet(ref, next.id));
+      fromDate = next.id;
+    }
+  } catch (e) {
+    debugPrint('Carry-forward sync skipped: $e');
+  }
 });

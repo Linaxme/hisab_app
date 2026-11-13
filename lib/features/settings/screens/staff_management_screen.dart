@@ -211,7 +211,7 @@ class _StaffCard extends ConsumerWidget {
 
     if (confirm == true) {
       try {
-        await ref.read(userRepositoryProvider).updateUserStatus(staff.uid, newStatus);
+        await ref.read(userRepositoryProvider).updateUserStatus(staff.uid, newStatus, shopId: staff.shopId);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -74,6 +74,24 @@ class CreditRepository {
         });
   }
 
+  // Credit sales for a date range (reports)
+  Future<List<CreditSaleModel>> getCreditSalesByDateRange(String startDate, String endDate) async {
+    final snapshot = await _creditSalesCollection
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endDate)
+        .get();
+    return snapshot.docs.map((doc) => CreditSaleModel.fromFirestore(doc)).toList();
+  }
+
+  // Credit collections for a date range (reports)
+  Future<List<CreditCollectionModel>> getCollectionsByDateRange(String startDate, String endDate) async {
+    final snapshot = await _collectionsCollection
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endDate)
+        .get();
+    return snapshot.docs.map((doc) => CreditCollectionModel.fromFirestore(doc)).toList();
+  }
+
   // Get single credit sale
   Future<CreditSaleModel?> getCreditSale(String id) async {
     final doc = await _creditSalesCollection.doc(id).get();

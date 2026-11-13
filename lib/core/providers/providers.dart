@@ -4,3 +4,4 @@ export 'shop_provider.dart';
 export 'data_providers.dart';
 export 'theme_provider.dart';
 export 'language_provider.dart';
+export 'premium_providers.dart';

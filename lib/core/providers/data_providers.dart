@@ -264,6 +264,14 @@ final openingCashProvider = StreamProvider<OpeningCashModel?>((ref) {
   return repository.watchOpeningCash(formatDateForQuery(date));
 });
 
+/// Drawer counts made during the selected day.
+final cashChecksProvider = StreamProvider<List<CashCheckModel>>((ref) {
+  final repository = ref.watch(openingCashRepositoryProvider);
+  final date = ref.watch(selectedDateProvider);
+  if (repository == null) return Stream.value(const []);
+  return repository.watchCashChecks(formatDateForQuery(date));
+});
+
 // ============ LIVE CASH PROVIDER ============
 // LiveCash = OpeningCash + CashSales + CreditCollections - ManualDeposits - CashExpenses - Returns
 // Note: Auto-created deposits from non-cash sales are excluded
